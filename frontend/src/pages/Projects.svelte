@@ -1,12 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { API_BASE, authHeaders, listProjects, setProject, token, type Project } from '../lib/api';
+	import { API_BASE, createProject, currentOrgId, listProjects, setProject, token, type Project } from '../lib/api';
 	import { get } from 'svelte/store';
 
 	let projects = $state<Project[]>([]);
 	let error = $state('');
 	let name = $state('');
-	let orgId = $state('');
 	let creating = $state(false);
 
 	async function load() {
@@ -23,16 +22,9 @@
 		creating = true;
 		error = '';
 		try {
-			const t = get(token) ?? '';
-			// orgId defaults to the first project's org for convenience.
-			const org = orgId || projects[0]?.organizationId;
-			if (!org) throw new Error('no organization — register an account first');
-			const res = await fetch(`${API_BASE}/api/v1/projects`, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json', ...authHeaders(t) },
-				body: JSON.stringify({ name, organizationId: org })
-			});
-			if (!res.ok) throw new Error('create failed');
+			// Server defaults to the caller's org when omitted (single-org
+			// accounts); stored org is sent when we know it (multi-org).
+			await createProject(API_BASE, get(token) ?? '', name, get(currentOrgId) ?? undefined);
 			name = '';
 			await load();
 		} catch (err) {

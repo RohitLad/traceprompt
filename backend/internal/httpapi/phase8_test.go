@@ -5,8 +5,11 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/traceprompt/traceprompt/backend/internal/models"
 )
 
 // Covers previously untested list/detail paths and validation edges.
@@ -169,4 +172,47 @@ func TestSessionsEmptyAndScoreConfigRef(t *testing.T) {
 	code, _ = postPublic(t, app, pub, sec, "/api/public/scores",
 		map[string]any{"traceId": "t", "name": "strict", "value": 0.5, "configId": cfg["id"]})
 	assert.Equal(t, http.StatusOK, code)
+}
+
+func TestCreateProjectOrgFallback(t *testing.T) {
+	app := newTestApp(t)
+	token, orgID := register(t, app, "fb@example.com")
+
+	// Fresh account, zero projects: name-only creation lands in their org.
+	code, body := postUI(t, app, token, "/api/v1/projects", map[string]any{"name": "first"})
+	require.Equal(t, http.StatusCreated, code, "body: %v", body)
+	assert.Equal(t, orgID, body["organizationId"])
+
+	// Explicit org still works and wins.
+	code, body = postUI(t, app, token, "/api/v1/projects",
+		map[string]any{"name": "second", "organizationId": orgID})
+	require.Equal(t, http.StatusCreated, code, "body: %v", body)
+
+	// Unknown org is forbidden, not a silent misfile.
+	// (An explicit zero UUID counts as omitted — same as absent.)
+	code, _ = postUI(t, app, token, "/api/v1/projects",
+		map[string]any{"name": "x", "organizationId": "11111111-1111-1111-1111-111111111111"})
+	assert.Equal(t, http.StatusForbidden, code)
+}
+
+func TestCreateProjectMultiOrgRequiresChoice(t *testing.T) {
+	app := newTestApp(t)
+	tokenA, _ := register(t, app, "ma@example.com")
+	_, orgB := register(t, app, "mb@example.com")
+
+	// Make A a member of B's org too (direct insert mirrors an invite flow).
+	var userA models.User
+	require.NoError(t, app.db.First(&userA, "email = ?", "ma@example.com").Error)
+	orgBID, err := uuid.Parse(orgB)
+	require.NoError(t, err)
+	require.NoError(t, app.db.Create(&models.Membership{
+		UserID: userA.ID, OrganizationID: orgBID, Role: "member",
+	}).Error)
+
+	code, _ := postUI(t, app, tokenA, "/api/v1/projects", map[string]any{"name": "ambiguous"})
+	assert.Equal(t, http.StatusBadRequest, code, "multi-org callers must choose")
+
+	code, _ = postUI(t, app, tokenA, "/api/v1/projects",
+		map[string]any{"name": "placed", "organizationId": orgB})
+	assert.Equal(t, http.StatusCreated, code)
 }

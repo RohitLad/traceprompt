@@ -22,8 +22,10 @@ func isUniqueViolation(err error) bool {
 }
 
 type createProjectReq struct {
-	Name           string    `json:"name"`
-	OrganizationID uuid.UUID `json:"organizationId"`
+	Name string `json:"name"`
+	// OrganizationID is optional: omitted when the caller belongs to exactly
+	// one organization (the common case, including every fresh account).
+	OrganizationID *uuid.UUID `json:"organizationId"`
 }
 
 type projectOut struct {
@@ -45,25 +47,46 @@ func (h *Handler) CreateProject(c *fiber.Ctx) error {
 	if strings.TrimSpace(req.Name) == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "name is required")
 	}
-	if req.OrganizationID == uuid.Nil {
-		return fiber.NewError(fiber.StatusBadRequest, "organizationId is required")
-	}
-	var count int64
-	if err := h.db.Model(&models.Membership{}).
-		Where("user_id = ? AND organization_id = ?", uid, req.OrganizationID).
-		Count(&count).Error; err != nil {
+	orgID, err := h.resolveOrg(uid, req.OrganizationID)
+	if err != nil {
 		return err
 	}
-	if count == 0 {
-		return fiber.NewError(fiber.StatusForbidden, "not a member of this organization")
-	}
-	project := models.Project{OrganizationID: req.OrganizationID, Name: strings.TrimSpace(req.Name)}
+	project := models.Project{OrganizationID: orgID, Name: strings.TrimSpace(req.Name)}
 	if err := h.db.Create(&project).Error; err != nil {
 		return err
 	}
 	return c.Status(fiber.StatusCreated).JSON(projectOut{
 		ID: project.ID, OrganizationID: project.OrganizationID, Name: project.Name,
 	})
+}
+
+// resolveOrg validates an explicit org choice, or defaults to the caller's
+// sole organization so first-project creation just works.
+func (h *Handler) resolveOrg(uid uuid.UUID, explicit *uuid.UUID) (uuid.UUID, error) {
+	if explicit != nil && *explicit != uuid.Nil {
+		var count int64
+		if err := h.db.Model(&models.Membership{}).
+			Where("user_id = ? AND organization_id = ?", uid, *explicit).
+			Count(&count).Error; err != nil {
+			return uuid.Nil, err
+		}
+		if count == 0 {
+			return uuid.Nil, fiber.NewError(fiber.StatusForbidden, "not a member of this organization")
+		}
+		return *explicit, nil
+	}
+	var memberships []models.Membership
+	if err := h.db.Where("user_id = ?", uid).Find(&memberships).Error; err != nil {
+		return uuid.Nil, err
+	}
+	switch len(memberships) {
+	case 0:
+		return uuid.Nil, fiber.NewError(fiber.StatusForbidden, "no organization — contact an admin for an invite")
+	case 1:
+		return memberships[0].OrganizationID, nil
+	default:
+		return uuid.Nil, fiber.NewError(fiber.StatusBadRequest, "organizationId is required when you belong to multiple organizations")
+	}
 }
 
 // ListProjects returns all projects in orgs the user belongs to.

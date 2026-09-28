@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { API_BASE, login, register, setToken } from '../lib/api';
+	import { API_BASE, login, register, setOrg, setToken } from '../lib/api';
 
 	let mode = $state<'login' | 'register'>('login');
 	let email = $state('');
@@ -19,6 +19,7 @@
 					? await login(API_BASE, email, password)
 					: await register(API_BASE, email, password, name, orgName);
 			setToken(out.token);
+			setOrg(out.org?.id ?? null);
 			location.hash = '#/projects';
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'request failed';

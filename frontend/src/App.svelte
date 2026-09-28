@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Router from 'svelte-spa-router';
-	import { setToken, token } from './lib/api';
+	import { setOrg, setProject, setToken, token } from './lib/api';
 	import Dashboard from './pages/Dashboard.svelte';
 	import DatasetDetail from './pages/DatasetDetail.svelte';
 	import Datasets from './pages/Datasets.svelte';
@@ -33,6 +33,8 @@
 
 	function logout() {
 		setToken(null);
+		setOrg(null);
+		setProject(null);
 		location.hash = '#/login';
 	}
 </script>

@@ -9,12 +9,16 @@ export const API_BASE: string =
 
 const TOKEN_KEY = 'traceprompt.token';
 const PROJECT_KEY = 'traceprompt.projectId';
+const ORG_KEY = 'traceprompt.orgId';
 
 export const token = writable<string | null>(
 	typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null
 );
 export const currentProjectId = writable<string | null>(
 	typeof localStorage !== 'undefined' ? localStorage.getItem(PROJECT_KEY) : null
+);
+export const currentOrgId = writable<string | null>(
+	typeof localStorage !== 'undefined' ? localStorage.getItem(ORG_KEY) : null
 );
 
 export function setToken(t: string | null) {
@@ -29,6 +33,13 @@ export function setProject(id: string | null) {
 	if (typeof localStorage === 'undefined') return;
 	if (id) localStorage.setItem(PROJECT_KEY, id);
 	else localStorage.removeItem(PROJECT_KEY);
+}
+
+export function setOrg(id: string | null) {
+	currentOrgId.set(id);
+	if (typeof localStorage === 'undefined') return;
+	if (id) localStorage.setItem(ORG_KEY, id);
+	else localStorage.removeItem(ORG_KEY);
 }
 
 export function authHeaders(t: string | null): Record<string, string> {
@@ -83,6 +94,24 @@ export async function listProjects(base: string, t: string): Promise<Project[]> 
 	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
 	const body = (await res.json()) as { data: Project[] };
 	return body.data ?? [];
+}
+
+export async function createProject(
+	base: string,
+	t: string,
+	name: string,
+	organizationId?: string
+): Promise<Project> {
+	const res = await fetch(`${base}/api/v1/projects`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', ...authHeaders(t) },
+		// organizationId is optional server-side: omitted for single-org accounts.
+		body: JSON.stringify(
+			organizationId ? { name, organizationId } : { name }
+		)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return (await res.json()) as Project;
 }
 
 export interface UITrace {

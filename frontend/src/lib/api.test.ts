@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { authHeaders, formatLatency, getMetrics, listProjects, login, parseError, tracesListUrl, tracesUrl } from './api';
+import { authHeaders, createProject, formatLatency, getMetrics, listProjects, login, parseError, tracesListUrl, tracesUrl } from './api';
 
 describe('tracesUrl', () => {
 	it('builds base observations URL without params', () => {
@@ -108,5 +108,24 @@ describe('fetch wrappers', () => {
 			})
 		);
 		await expect(getMetrics('http://api', 'tok', 'p')).rejects.toThrow('request failed (403)');
+	});
+
+	it('createProject omits organizationId for single-org accounts', async () => {
+		mockFetchOnce(201, { id: 'p', name: 'P', organizationId: 'o' });
+		const out = await createProject('http://api', 'tok', 'P');
+		expect(out.id).toBe('p');
+		expect(fetch).toHaveBeenCalledWith(
+			'http://api/api/v1/projects',
+			expect.objectContaining({ body: JSON.stringify({ name: 'P' }) })
+		);
+	});
+
+	it('createProject sends organizationId when known (multi-org)', async () => {
+		mockFetchOnce(201, { id: 'p', name: 'P', organizationId: 'o' });
+		await createProject('http://api', 'tok', 'P', 'o');
+		expect(fetch).toHaveBeenCalledWith(
+			'http://api/api/v1/projects',
+			expect.objectContaining({ body: JSON.stringify({ name: 'P', organizationId: 'o' }) })
+		);
 	});
 });
