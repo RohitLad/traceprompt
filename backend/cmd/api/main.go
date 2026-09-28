@@ -14,7 +14,6 @@ import (
 	"github.com/traceprompt/traceprompt/backend/internal/db"
 	"github.com/traceprompt/traceprompt/backend/internal/httpapi"
 	"github.com/traceprompt/traceprompt/backend/internal/ingest"
-	"github.com/traceprompt/traceprompt/backend/internal/models"
 	"github.com/traceprompt/traceprompt/backend/internal/queue"
 	"github.com/traceprompt/traceprompt/backend/internal/worker"
 )
@@ -27,11 +26,6 @@ func main() {
 	if err != nil {
 		log.Printf("warning: database unavailable, serving health only: %v", err)
 		gdb = nil
-	} else if cfg.Env != "production" {
-		// Dev/test convenience. Production must use versioned SQL migrations.
-		if err := gdb.AutoMigrate(models.AllModels()...); err != nil {
-			log.Printf("warning: automigrate failed: %v", err)
-		}
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -39,8 +33,17 @@ func main() {
 
 	var deps *httpapi.Deps
 	if gdb != nil {
+		sqlDB, err := gdb.DB()
+		if err != nil {
+			log.Fatalf("database handle: %v", err)
+		}
+		// Versioned migrations are the schema source of truth in every env
+		// with Postgres (dev included). SQLite tests use AutoMigrate.
+		if err := db.Migrate(sqlDB); err != nil {
+			log.Fatalf("migrations: %v", err)
+		}
 		q := resolveQueue(ctx, cfg.RedisURL, gdb)
-		deps = &httpapi.Deps{DB: gdb, JWTSecret: cfg.JWTSecret, Queue: q}
+		deps = &httpapi.Deps{DB: gdb, JWTSecret: cfg.JWTSecret, Queue: q, PublicRateLimit: cfg.PublicRateLimit}
 	}
 	app := httpapi.New(deps)
 

@@ -14,16 +14,21 @@ type Config struct {
 	DatabaseURL string
 	RedisURL    string
 	JWTSecret   string
+	// PublicRateLimit caps /api/public requests per IP per minute.
+	// SDKs batch aggressively; 300 default tolerates bursts while
+	// bounding abuse. 0 disables (local dev only).
+	PublicRateLimit int
 }
 
 // Load reads configuration from environment variables.
 func Load() Config {
 	return Config{
-		Env:         envOr("APP_ENV", "development"),
-		Port:        envIntOr("PORT", 3000),
-		DatabaseURL: envOr("DATABASE_URL", "postgres://traceprompt:traceprompt@localhost:5432/traceprompt?sslmode=disable"),
-		RedisURL:    envOr("REDIS_URL", "redis://localhost:6379/0"),
-		JWTSecret:   envOr("JWT_SECRET", "dev-only-change-me"),
+		Env:             envOr("APP_ENV", "development"),
+		Port:            envIntOr("PORT", 3000),
+		DatabaseURL:     envOr("DATABASE_URL", "postgres://traceprompt:traceprompt@localhost:5432/traceprompt?sslmode=disable"),
+		RedisURL:        envOr("REDIS_URL", "redis://localhost:6379/0"),
+		JWTSecret:       envOr("JWT_SECRET", "dev-only-change-me"),
+		PublicRateLimit: envIntOr("PUBLIC_RATE_LIMIT_PER_MIN", 300),
 	}
 }
 

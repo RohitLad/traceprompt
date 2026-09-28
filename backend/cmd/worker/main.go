@@ -12,7 +12,6 @@ import (
 	"github.com/traceprompt/traceprompt/backend/internal/config"
 	"github.com/traceprompt/traceprompt/backend/internal/db"
 	"github.com/traceprompt/traceprompt/backend/internal/ingest"
-	"github.com/traceprompt/traceprompt/backend/internal/models"
 	"github.com/traceprompt/traceprompt/backend/internal/queue"
 	"github.com/traceprompt/traceprompt/backend/internal/worker"
 )
@@ -24,9 +23,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("worker: database: %v", err)
 	}
-	if err := gdb.AutoMigrate(models.AllModels()...); err != nil {
-		// Harmless when tables exist; versioned migrations replace this later.
-		log.Printf("worker: automigrate: %v", err)
+	sqlDB, err := gdb.DB()
+	if err != nil {
+		log.Fatalf("worker: database handle: %v", err)
+	}
+	if err := db.Migrate(sqlDB); err != nil {
+		log.Fatalf("worker: migrations: %v", err)
 	}
 
 	rq, err := queue.NewRedis(cfg.RedisURL)

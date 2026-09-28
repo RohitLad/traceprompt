@@ -214,8 +214,8 @@ func AuthModels() []any {
 	return []any{&Organization{}, &User{}, &Membership{}, &Project{}, &ApiKey{}}
 }
 
-// AllModels lists every GORM model for AutoMigrate in dev/test.
-// Production should use versioned SQL migrations (see migrations/).
+// AllModels lists every GORM model for AutoMigrate in tests (SQLite).
+// Postgres schema is owned by versioned SQL migrations (internal/db/migrations).
 func AllModels() []any {
 	return append(AuthModels(),
 		&Trace{}, &Observation{}, &Score{},

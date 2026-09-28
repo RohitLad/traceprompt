@@ -1,9 +1,12 @@
 package httpapi
 
 import (
+	"time"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"gorm.io/gorm"
@@ -16,6 +19,8 @@ type Deps struct {
 	DB        *gorm.DB
 	JWTSecret string
 	Queue     queue.Queue
+	// PublicRateLimit caps /api/public requests per IP per minute (0 = off).
+	PublicRateLimit int
 }
 
 // New builds the Fiber app with production-safe middleware.
@@ -87,7 +92,22 @@ func New(d *Deps) *fiber.App {
 	v1.Get("/projects/:id/scores", h.requireJWT, h.requireProjectMember, h.ListScoresUI)
 
 	// Public API (BasicAuth pk:sk, Langfuse-compatible).
-	pub := app.Group("/api/public", h.requireAPIKey)
+	pub := app.Group("/api/public")
+	if d.PublicRateLimit > 0 {
+		pub.Use(limiter.New(limiter.Config{
+			Max:        d.PublicRateLimit,
+			Expiration: time.Minute,
+			KeyGenerator: func(c *fiber.Ctx) string {
+				return c.IP()
+			},
+			LimitReached: func(c *fiber.Ctx) error {
+				return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+					"error": "rate limit exceeded, retry in a minute",
+				})
+			},
+		}))
+	}
+	pub.Use(h.requireAPIKey)
 	pub.Get("/projects", h.PublicProjects)
 	pub.Post("/ingestion", h.Ingestion)
 	pub.Post("/otel/v1/traces", h.OtelIngestion)

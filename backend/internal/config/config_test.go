@@ -13,6 +13,7 @@ func TestLoadDefaults(t *testing.T) {
 	assert.Equal(t, ":3000", cfg.Addr())
 	assert.NotEmpty(t, cfg.DatabaseURL)
 	assert.NotEmpty(t, cfg.RedisURL)
+	assert.Equal(t, 300, cfg.PublicRateLimit)
 }
 
 func TestAddrFormat(t *testing.T) {
