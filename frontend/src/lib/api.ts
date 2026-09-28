@@ -147,6 +147,88 @@ export async function getTrace(
 	return body.data;
 }
 
+export interface PromptVersion {
+	version: number;
+	template?: string | null;
+	messages?: { role: string; content: string }[] | null;
+	config: Record<string, unknown>;
+	labels: string[];
+	commitMessage?: string | null;
+}
+
+export interface PromptSummary {
+	name: string;
+	type: string;
+	versions: number;
+	productionVersion?: number | null;
+	labels: string[];
+}
+
+export interface PromptDetail {
+	name: string;
+	type: string;
+	versions: PromptVersion[];
+}
+
+export async function listPrompts(base: string, t: string, projectId: string): Promise<PromptSummary[]> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/prompts`, { headers: authHeaders(t) });
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return (((await res.json()) as { data: PromptSummary[] }).data ?? []);
+}
+
+export async function getPromptDetail(base: string, t: string, projectId: string, name: string): Promise<PromptDetail> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/prompts/${name}`, {
+		headers: authHeaders(t)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return (await res.json()) as PromptDetail;
+}
+
+export async function createPrompt(
+	base: string,
+	t: string,
+	projectId: string,
+	payload: { name: string; type: string; template?: string; messages?: { role: string; content: string }[] }
+): Promise<void> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/prompts`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', ...authHeaders(t) },
+		body: JSON.stringify(payload)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+}
+
+export async function createPromptVersion(
+	base: string,
+	t: string,
+	projectId: string,
+	name: string,
+	payload: { template?: string; commitMessage?: string }
+): Promise<void> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/prompts/${name}/versions`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', ...authHeaders(t) },
+		body: JSON.stringify(payload)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+}
+
+export async function setPromptLabels(
+	base: string,
+	t: string,
+	projectId: string,
+	name: string,
+	version: number,
+	labels: string[]
+): Promise<void> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/prompts/${name}/labels`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', ...authHeaders(t) },
+		body: JSON.stringify({ version, labels })
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+}
+
 export function parseError(text: string, status: number): string {
 	try {
 		const body = JSON.parse(text) as { error?: string };

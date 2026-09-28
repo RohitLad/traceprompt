@@ -147,6 +147,33 @@ type Score struct {
 	Comment       *string   `json:"comment"`
 }
 
+// Prompt centralizes a versioned template (text or chat) outside app code.
+type Prompt struct {
+	Base
+	ProjectID uuid.UUID `gorm:"uniqueIndex:idx_prompts_project_name,priority:1;not null" json:"projectId"`
+	Name      string    `gorm:"uniqueIndex:idx_prompts_project_name,priority:2;not null" json:"name"`
+	Type      string    `gorm:"not null;default:text" json:"type"` // text|chat
+}
+
+// PromptVersion is one immutable template revision. Labels (e.g.
+// "production", "latest") move between versions to control rollouts.
+type PromptVersion struct {
+	Base
+	PromptID      uuid.UUID       `gorm:"uniqueIndex:idx_prompt_versions,priority:1;not null" json:"promptId"`
+	Version       int             `gorm:"uniqueIndex:idx_prompt_versions,priority:2;not null" json:"version"`
+	Template      *string         `gorm:"type:text" json:"template"`                 // text prompts
+	Messages      []PromptMessage `gorm:"serializer:json" json:"messages,omitempty"` // chat prompts
+	Config        map[string]any  `gorm:"serializer:json;type:jsonb" json:"config"`
+	Labels        []string        `gorm:"serializer:json" json:"labels"`
+	CommitMessage *string         `json:"commitMessage"`
+}
+
+// PromptMessage is one chat turn with mustache-style {{variables}}.
+type PromptMessage struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
 // AuthModels are migrated first and work on SQLite (tests) and Postgres.
 func AuthModels() []any {
 	return []any{&Organization{}, &User{}, &Membership{}, &Project{}, &ApiKey{}}
@@ -155,5 +182,5 @@ func AuthModels() []any {
 // AllModels lists every GORM model for AutoMigrate in dev/test.
 // Production should use versioned SQL migrations (see migrations/).
 func AllModels() []any {
-	return append(AuthModels(), &Trace{}, &Observation{}, &Score{})
+	return append(AuthModels(), &Trace{}, &Observation{}, &Score{}, &Prompt{}, &PromptVersion{})
 }

@@ -67,14 +67,21 @@ func New(d *Deps) *fiber.App {
 	v1.Post("/projects/:id/keys/:keyId/revoke", h.requireJWT, h.requireProjectMember, h.RevokeKey)
 	v1.Get("/projects/:id/traces", h.requireJWT, h.requireProjectMember, h.ListTracesUI)
 	v1.Get("/projects/:id/traces/:traceId", h.requireJWT, h.requireProjectMember, h.GetTraceUI)
+	v1.Get("/projects/:id/prompts", h.requireJWT, h.requireProjectMember, h.ListPrompts)
+	v1.Post("/projects/:id/prompts", h.requireJWT, h.requireProjectMember, h.CreatePrompt)
+	v1.Get("/projects/:id/prompts/:name", h.requireJWT, h.requireProjectMember, h.GetPrompt)
+	v1.Post("/projects/:id/prompts/:name/versions", h.requireJWT, h.requireProjectMember, h.CreatePromptVersion)
+	v1.Post("/projects/:id/prompts/:name/labels", h.requireJWT, h.requireProjectMember, h.SetPromptLabels)
 
 	// Public API (BasicAuth pk:sk, Langfuse-compatible).
 	pub := app.Group("/api/public", h.requireAPIKey)
 	pub.Get("/projects", h.PublicProjects)
 	pub.Post("/ingestion", h.Ingestion)
+	pub.Post("/otel/v1/traces", h.OtelIngestion)
 	pub.Get("/v2/observations", h.ListObservationsV2)
 	pub.Post("/scores", h.CreateScore)
 	pub.Get("/v3/scores", h.ListScoresV3)
+	pub.Get("/prompts/:name", h.GetPublicPrompt)
 
 	return app
 }

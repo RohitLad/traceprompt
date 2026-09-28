@@ -12,6 +12,7 @@ import (
 
 	"github.com/traceprompt/traceprompt/backend/internal/ingest"
 	"github.com/traceprompt/traceprompt/backend/internal/models"
+	"github.com/traceprompt/traceprompt/backend/internal/otel"
 	"github.com/traceprompt/traceprompt/backend/internal/queue"
 )
 
@@ -48,6 +49,32 @@ func orEmptyErrors(errs []ingest.EventError) []ingest.EventError {
 		return []ingest.EventError{}
 	}
 	return errs
+}
+
+// POST /api/public/otel/v1/traces — OTLP/HTTP ingestion (the supported
+// path for trace ingestion; legacy /ingestion stays for SDK compat).
+// Responds 200 with {} per OTLP spec; per-span errors are counted and
+// logged but do not fail the batch.
+func (h *Handler) OtelIngestion(c *fiber.Ctx) error {
+	p := currentProject(c)
+	if p == nil {
+		return fiber.NewError(fiber.StatusUnauthorized, "invalid credentials")
+	}
+	raw := json.RawMessage(append([]byte(nil), c.Body()...))
+	parsed, errs := otel.ToEvents(raw)
+	if len(parsed) == 0 && len(errs) > 0 {
+		return fiber.NewError(fiber.StatusBadRequest, errs[0].Message)
+	}
+	items := make([]queue.Item, 0, len(parsed))
+	for _, ev := range parsed {
+		items = append(items, queue.FromParsed(p.ID, ev))
+	}
+	if len(items) > 0 {
+		if err := h.queue.Enqueue(c.Context(), items); err != nil {
+			return fiber.NewError(fiber.StatusServiceUnavailable, "ingestion queue unavailable")
+		}
+	}
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{})
 }
 
 // observationOut mirrors Langfuse v2 observation rows (core+basic+usage+io).
