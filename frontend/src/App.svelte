@@ -4,6 +4,7 @@
 	import Dashboard from './pages/Dashboard.svelte';
 	import DatasetDetail from './pages/DatasetDetail.svelte';
 	import Datasets from './pages/Datasets.svelte';
+	import Evals from './pages/Evals.svelte';
 	import Keys from './pages/Keys.svelte';
 	import Login from './pages/Login.svelte';
 	import Playground from './pages/Playground.svelte';
@@ -23,6 +24,7 @@
 		'/traces/:traceId': TraceDetail,
 		'/sessions': Sessions,
 		'/scores': Scores,
+		'/evals': Evals,
 		'/prompts': Prompts,
 		'/playground': Playground,
 		'/datasets': Datasets,
@@ -45,6 +47,7 @@
 			<li><a href="#/traces">Traces</a></li>
 			<li><a href="#/sessions">Sessions</a></li>
 			<li><a href="#/scores">Scores</a></li>
+			<li><a href="#/evals">Evals</a></li>
 			<li><a href="#/prompts">Prompts</a></li>
 			<li><a href="#/playground">Playground</a></li>
 			<li><a href="#/datasets">Datasets</a></li>

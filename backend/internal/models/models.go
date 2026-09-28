@@ -209,6 +209,37 @@ type DatasetRunItem struct {
 	TraceID *string   `gorm:"index" json:"traceId"`
 }
 
+// ScoreConfig declares the schema for a named score: its type, numeric
+// range, or allowed categories. Scores whose name matches a config are
+// validated on ingest (out-of-schema values are dead-lettered, not stored).
+type ScoreConfig struct {
+	Base
+	ProjectID   uuid.UUID `gorm:"uniqueIndex:idx_score_configs,priority:1;not null" json:"projectId"`
+	Name        string    `gorm:"uniqueIndex:idx_score_configs,priority:2;not null" json:"name"`
+	DataType    string    `gorm:"not null" json:"dataType"` // NUMERIC|CATEGORICAL|BOOLEAN
+	MinValue    *float64  `json:"minValue"`
+	MaxValue    *float64  `json:"maxValue"`
+	Categories  []string  `gorm:"serializer:json" json:"categories"`
+	Description *string   `json:"description"`
+}
+
+// AnnotationQueue is a human-review worklist of traces/observations.
+type AnnotationQueue struct {
+	Base
+	ProjectID   uuid.UUID `gorm:"uniqueIndex:idx_anno_queues,priority:1;not null" json:"projectId"`
+	Name        string    `gorm:"uniqueIndex:idx_anno_queues,priority:2;not null" json:"name"`
+	Description *string   `json:"description"`
+}
+
+// AnnotationQueueItem links one trace (optionally one observation) to a queue.
+type AnnotationQueueItem struct {
+	Base
+	QueueID       uuid.UUID `gorm:"index;not null" json:"queueId"`
+	TraceID       *string   `gorm:"index" json:"traceId"`
+	ObservationID *string   `json:"observationId"`
+	Status        string    `gorm:"index;not null;default:PENDING" json:"status"` // PENDING|COMPLETED
+}
+
 // AuthModels are migrated first and work on SQLite (tests) and Postgres.
 func AuthModels() []any {
 	return []any{&Organization{}, &User{}, &Membership{}, &Project{}, &ApiKey{}}
@@ -221,5 +252,6 @@ func AllModels() []any {
 		&Trace{}, &Observation{}, &Score{},
 		&Prompt{}, &PromptVersion{},
 		&Dataset{}, &DatasetItem{}, &DatasetRun{}, &DatasetRunItem{},
+		&ScoreConfig{}, &AnnotationQueue{}, &AnnotationQueueItem{},
 	)
 }

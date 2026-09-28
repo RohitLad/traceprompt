@@ -411,6 +411,105 @@ export async function listScores(
 	return (((await res.json()) as { data: ScoreRow[] }).data ?? []);
 }
 
+export interface ScoreConfig {
+	id: string;
+	name: string;
+	dataType: string;
+	minValue?: number | null;
+	maxValue?: number | null;
+	categories: string[];
+}
+
+export async function listScoreConfigs(base: string, t: string, projectId: string): Promise<ScoreConfig[]> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/score-configs`, { headers: authHeaders(t) });
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return (((await res.json()) as { data: ScoreConfig[] }).data ?? []);
+}
+
+export async function createScoreConfig(
+	base: string,
+	t: string,
+	projectId: string,
+	payload: { name: string; dataType: string; minValue?: number; maxValue?: number; categories?: string[] }
+): Promise<void> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/score-configs`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', ...authHeaders(t) },
+		body: JSON.stringify(payload)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+}
+
+export interface ReviewQueue {
+	id: string;
+	name: string;
+	pending: number;
+	total: number;
+}
+
+export interface QueueItem {
+	id: string;
+	traceId?: string | null;
+	observationId?: string | null;
+	status: string;
+	traceName?: string | null;
+}
+
+export async function listQueues(base: string, t: string, projectId: string): Promise<ReviewQueue[]> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/annotation-queues`, {
+		headers: authHeaders(t)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return (((await res.json()) as { data: ReviewQueue[] }).data ?? []);
+}
+
+export async function createQueue(base: string, t: string, projectId: string, name: string): Promise<void> {
+	await reqJSON(base, t, `/api/v1/projects/${projectId}/annotation-queues`, 'POST', { name });
+}
+
+export async function getQueue(
+	base: string,
+	t: string,
+	projectId: string,
+	queueId: string,
+	status?: string
+): Promise<QueueItem[]> {
+	const q = status ? `?status=${status}` : '';
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/annotation-queues/${queueId}${q}`, {
+		headers: authHeaders(t)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	const body = (await res.json()) as { data: { items: QueueItem[] } };
+	return body.data.items ?? [];
+}
+
+export async function addQueueItem(base: string, t: string, projectId: string, queueId: string, traceId: string): Promise<void> {
+	await reqJSON(base, t, `/api/v1/projects/${projectId}/annotation-queues/${queueId}/items`, 'POST', { traceId });
+}
+
+export async function completeQueueItem(base: string, t: string, projectId: string, queueId: string, itemId: string): Promise<void> {
+	await reqJSON(base, t, `/api/v1/projects/${projectId}/annotation-queues/${queueId}/items/${itemId}/complete`, 'POST', {});
+}
+
+export async function scoreQueueItem(
+	base: string,
+	t: string,
+	projectId: string,
+	queueId: string,
+	itemId: string,
+	name: string,
+	value: string
+): Promise<void> {
+	const num = Number(value);
+	await reqJSON(
+		base,
+		t,
+		`/api/v1/projects/${projectId}/annotation-queues/${queueId}/items/${itemId}/scores`,
+		'POST',
+		{ name, value: value !== '' && !Number.isNaN(num) ? num : value }
+	);
+}
+
 export function parseError(text: string, status: number): string {
 	try {
 		const body = JSON.parse(text) as { error?: string };

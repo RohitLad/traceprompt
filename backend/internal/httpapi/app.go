@@ -90,6 +90,14 @@ func New(d *Deps) *fiber.App {
 	v1.Get("/projects/:id/sessions", h.requireJWT, h.requireProjectMember, h.ListSessionsUI)
 	v1.Get("/projects/:id/sessions/:sid/traces", h.requireJWT, h.requireProjectMember, h.ListSessionTracesUI)
 	v1.Get("/projects/:id/scores", h.requireJWT, h.requireProjectMember, h.ListScoresUI)
+	v1.Get("/projects/:id/score-configs", h.requireJWT, h.requireProjectMember, h.ListScoreConfigs)
+	v1.Post("/projects/:id/score-configs", h.requireJWT, h.requireProjectMember, h.CreateScoreConfig)
+	v1.Get("/projects/:id/annotation-queues", h.requireJWT, h.requireProjectMember, h.ListQueues)
+	v1.Post("/projects/:id/annotation-queues", h.requireJWT, h.requireProjectMember, h.CreateQueue)
+	v1.Get("/projects/:id/annotation-queues/:qid", h.requireJWT, h.requireProjectMember, h.GetQueue)
+	v1.Post("/projects/:id/annotation-queues/:qid/items", h.requireJWT, h.requireProjectMember, h.AddQueueItem)
+	v1.Post("/projects/:id/annotation-queues/:qid/items/:itemId/complete", h.requireJWT, h.requireProjectMember, h.CompleteQueueItem)
+	v1.Post("/projects/:id/annotation-queues/:qid/items/:itemId/scores", h.requireJWT, h.requireProjectMember, h.ScoreQueueItem)
 
 	// Public API (BasicAuth pk:sk, Langfuse-compatible).
 	pub := app.Group("/api/public")
@@ -117,6 +125,7 @@ func New(d *Deps) *fiber.App {
 	pub.Get("/prompts/:name", h.GetPublicPrompt)
 	pub.Get("/datasets", h.ListPublicDatasets)
 	pub.Get("/datasets/:name", h.GetPublicDataset)
+	pub.Get("/score-configs", h.ListPublicScoreConfigs)
 
 	return app
 }

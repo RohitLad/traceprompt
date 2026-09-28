@@ -92,6 +92,11 @@ func handleMessage(ctx context.Context, client *redis.Client, store *ingest.Stor
 		return
 	}
 	if err := store.Apply(ctx, pid, it.ToParsed()); err != nil {
+		if ingest.IsPermanent(err) {
+			deadLetter(ctx, client, msg.ID, raw, err.Error())
+			ack(ctx, client, msg.ID)
+			return
+		}
 		// Retry via redelivery; dead-letter after MaxAttempts.
 		pending, perr := client.XPendingExt(ctx, &redis.XPendingExtArgs{
 			Stream: queue.Stream, Group: queue.Group,

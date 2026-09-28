@@ -9,6 +9,7 @@ package ingest
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -62,6 +63,31 @@ type EventSuccess struct {
 type Result struct {
 	Successes []EventSuccess `json:"successes"`
 	Errors    []EventError   `json:"errors"`
+}
+
+// PermanentError marks failures that retry cannot fix (schema violations).
+// Workers dead-letter these immediately instead of redelivering.
+type PermanentError struct {
+	Msg string
+}
+
+// Error implements error.
+func (e *PermanentError) Error() string {
+	return e.Msg
+}
+
+// Permanent wraps msg as a *PermanentError.
+func Permanent(msg string) *PermanentError {
+	return &PermanentError{Msg: msg}
+}
+
+// IsPermanent reports whether err is a *PermanentError (unwrapping).
+func IsPermanent(err error) bool {
+	if err == nil {
+		return false
+	}
+	var target *PermanentError
+	return errors.As(err, &target)
 }
 
 // Parsed is a validated event ready for enqueue/persist.

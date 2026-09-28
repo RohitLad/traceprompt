@@ -142,6 +142,7 @@ func TestMetricsOverview(t *testing.T) {
 	assert.NotEmpty(t, perDay)
 	byModel, _ := data["byModel"].([]any)
 	require.NotEmpty(t, byModel)
+	// gpt-4o has 2 observations vs 1 for "unknown" → sorts first.
 	assert.Equal(t, "gpt-4o", byModel[0].(map[string]any)["model"])
 	assert.False(t, data["truncated"].(bool))
 

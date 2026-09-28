@@ -3,6 +3,7 @@ package ingest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -233,6 +234,7 @@ type scoreBody struct {
 	Value         json.RawMessage `json:"value"`
 	DataType      *string         `json:"dataType"`
 	Comment       *string         `json:"comment"`
+	ConfigID      *string         `json:"configId"`
 }
 
 func (s *Store) applyScore(ctx context.Context, projectID uuid.UUID, p Parsed) error {
@@ -277,6 +279,10 @@ func (s *Store) applyScore(ctx context.Context, projectID uuid.UUID, p Parsed) e
 		sc.DataType = strings.ToUpper(*b.DataType)
 	}
 
+	if err := s.checkScoreConfig(ctx, projectID, &b, &sc); err != nil {
+		return err
+	}
+
 	if sc.ExternalID != nil {
 		return s.db.WithContext(ctx).Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "external_id"}},
@@ -284,6 +290,64 @@ func (s *Store) applyScore(ctx context.Context, projectID uuid.UUID, p Parsed) e
 		}).Create(&sc).Error
 	}
 	return s.db.WithContext(ctx).Create(&sc).Error
+}
+
+// checkScoreConfig enforces the project's score schema when the score names
+// (or references) a configured schema. Violations are permanent: the value
+// can never become valid by redelivery.
+func (s *Store) checkScoreConfig(ctx context.Context, projectID uuid.UUID, b *scoreBody, sc *models.Score) error {
+	var cfg models.ScoreConfig
+	if b.ConfigID != nil && *b.ConfigID != "" {
+		id, err := uuid.Parse(*b.ConfigID)
+		if err != nil {
+			return Permanent("invalid configId")
+		}
+		if err := s.db.WithContext(ctx).First(&cfg, "id = ? AND project_id = ?", id, projectID).Error; err != nil {
+			return Permanent("score config not found")
+		}
+		if cfg.Name != b.Name {
+			return Permanent("score name must equal its config name")
+		}
+	} else {
+		if err := s.db.WithContext(ctx).First(&cfg, "project_id = ? AND name = ?", projectID, b.Name).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil // no schema declared → anything goes
+			}
+			return err
+		}
+	}
+	if sc.DataType != cfg.DataType {
+		return Permanent("score dataType " + sc.DataType + " does not match config " + cfg.DataType)
+	}
+	switch cfg.DataType {
+	case "NUMERIC":
+		if sc.ValueNum == nil {
+			return Permanent("numeric score requires a numeric value")
+		}
+		if cfg.MinValue != nil && *sc.ValueNum < *cfg.MinValue {
+			return Permanent("score below config minimum")
+		}
+		if cfg.MaxValue != nil && *sc.ValueNum > *cfg.MaxValue {
+			return Permanent("score above config maximum")
+		}
+	case "CATEGORICAL":
+		if sc.ValueStr == nil {
+			return Permanent("categorical score requires a string value")
+		}
+		if len(cfg.Categories) > 0 && !containsStr(cfg.Categories, *sc.ValueStr) {
+			return Permanent("score category not in config")
+		}
+	}
+	return nil
+}
+
+func containsStr(hay []string, needle string) bool {
+	for _, s := range hay {
+		if s == needle {
+			return true
+		}
+	}
+	return false
 }
 
 func usageIn(b observationBody, input bool) *int {

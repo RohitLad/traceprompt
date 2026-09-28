@@ -110,6 +110,15 @@ func (h *Handler) MetricsOverview(c *fiber.Ctx) error {
 	for _, b := range byModel {
 		models_out = append(models_out, *b)
 	}
+	// Deterministic order: most observations first, ties by name.
+	for i := 1; i < len(models_out); i++ {
+		for j := i; j > 0 &&
+			(models_out[j-1].Observations < models_out[j].Observations ||
+				(models_out[j-1].Observations == models_out[j].Observations &&
+					models_out[j-1].Model > models_out[j].Model)); j-- {
+			models_out[j-1], models_out[j] = models_out[j], models_out[j-1]
+		}
+	}
 	var avgLatency *float64
 	if latencyN > 0 {
 		v := float64(latencySum) / float64(latencyN)

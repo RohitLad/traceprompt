@@ -293,6 +293,9 @@ func (h *Handler) CreateScore(c *fiber.Ctx) error {
 	}
 	store := ingest.NewStore(h.db)
 	if err := store.Apply(c.Context(), p.ID, parsed[0]); err != nil {
+		if ingest.IsPermanent(err) {
+			return fiber.NewError(fiber.StatusBadRequest, err.Error())
+		}
 		return err
 	}
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{"id": body["id"]})
