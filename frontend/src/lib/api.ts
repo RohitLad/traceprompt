@@ -114,6 +114,43 @@ export async function createProject(
 	return (await res.json()) as Project;
 }
 
+export interface APIKey {
+	id: string;
+	name: string;
+	publicKey: string;
+	createdAt: string;
+	revokedAt: string | null;
+}
+
+export async function listKeys(base: string, t: string, projectId: string): Promise<APIKey[]> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/keys`, { headers: authHeaders(t) });
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return (((await res.json()) as { data: APIKey[] }).data ?? []);
+}
+
+export async function createKey(
+	base: string,
+	t: string,
+	projectId: string,
+	name: string
+): Promise<APIKey & { secret: string }> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/keys`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', ...authHeaders(t) },
+		body: JSON.stringify({ name })
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return (await res.json()) as APIKey & { secret: string };
+}
+
+export async function revokeKey(base: string, t: string, projectId: string, keyId: string): Promise<void> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/keys/${keyId}/revoke`, {
+		method: 'POST',
+		headers: authHeaders(t)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+}
+
 export interface UITrace {
 	traceId: string;
 	name: string;

@@ -74,3 +74,32 @@ func TestDrainMemoryDropsBadProject(t *testing.T) {
 	db.Model(&models.Trace{}).Count(&n)
 	assert.Equal(t, int64(0), n)
 }
+
+func TestDrainMemoryToleratesSchemaViolations(t *testing.T) {
+	// A schema-violating score is a permanent failure: the worker logs it,
+	// drains past it, and never stores it — the queue must not wedge.
+	mem, store, db, pid := testSetup(t)
+	zero, one := 0.0, 1.0
+	require.NoError(t, db.Create(&models.ScoreConfig{
+		ProjectID: pid, Name: "q", DataType: "NUMERIC", MinValue: &zero, MaxValue: &one,
+	}).Error)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go DrainMemory(ctx, mem, store, 10*time.Millisecond)
+
+	require.NoError(t, mem.Enqueue(ctx, []queue.Item{
+		mustItem(t, pid, "score-create", `{"traceId":"t","name":"q","value":99}`),
+		mustItem(t, pid, "trace-create", `{"id":"after","name":"kept"}`),
+	}))
+	// Wait on persistence, not queue depth: Len()==0 fires the moment items
+	// are drained, potentially before Apply commits.
+	require.Eventually(t, func() bool {
+		var n int64
+		db.Model(&models.Trace{}).Where("trace_id = ?", "after").Count(&n)
+		return n == 1
+	}, 5*time.Second, 10*time.Millisecond)
+
+	var scores int64
+	db.Model(&models.Score{}).Count(&scores)
+	assert.Equal(t, int64(0), scores, "violating score never stored")
+}

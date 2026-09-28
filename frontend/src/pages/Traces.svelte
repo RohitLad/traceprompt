@@ -16,7 +16,10 @@
 	let projectId = $state('');
 	let traces = $state<UITrace[]>([]);
 	let cursor = $state<string | null>(null);
-	let prev = $state<string[]>([]);
+	// Page cursors: pages[i] is the cursor argument that loads page i.
+	// Index 0 (undefined) is the first page.
+	let pages = $state<(string | undefined)[]>([undefined]);
+	let page = $state(0);
 	let error = $state('');
 	let loading = $state(true);
 
@@ -25,7 +28,7 @@
 		projectId = get(currentProjectId) ?? projects[0]?.id ?? '';
 	}
 
-	async function load(cursorArg?: string) {
+	async function load() {
 		loading = true;
 		error = '';
 		try {
@@ -35,7 +38,7 @@
 				return;
 			}
 			setProject(projectId);
-			const out = await listTraces(API_BASE, get(token) ?? '', projectId, 25, cursorArg);
+			const out = await listTraces(API_BASE, get(token) ?? '', projectId, 25, pages[page]);
 			traces = out.data;
 			cursor = out.cursor;
 		} catch (err) {
@@ -45,11 +48,23 @@
 		}
 	}
 
+	function reset() {
+		pages = [undefined];
+		page = 0;
+		load();
+	}
+
 	function next() {
-		if (cursor) {
-			prev = [...prev, cursor];
-			load(cursor);
-		}
+		if (!cursor) return;
+		pages = [...pages.slice(0, page + 1), cursor];
+		page += 1;
+		load();
+	}
+
+	function prev() {
+		if (page === 0) return;
+		page -= 1;
+		load();
 	}
 
 	onMount(() => load());
@@ -62,10 +77,7 @@
 			<select
 			 class="select select-bordered select-sm max-w-xs"
 				bind:value={projectId}
-				onchange={() => {
-					prev = [];
-					load();
-				}}
+				onchange={reset}
 			>
 				{#each projects as p}<option value={p.id}>{p.name}</option>{/each}
 			</select>
@@ -97,7 +109,7 @@
 				</table>
 			</div>
 			<div class="join justify-end mt-2">
-				<button class="join-item btn btn-sm" disabled={prev.length === 0}>« Prev</button>
+				<button class="join-item btn btn-sm" disabled={page === 0} onclick={prev}>« Prev</button>
 				<button class="join-item btn btn-sm" disabled={!cursor} onclick={next}>Next »</button>
 			</div>
 		{/if}

@@ -23,6 +23,7 @@
 	let runs = $state<DatasetRun[]>([]);
 	let selectedRun = $state<RunDetail | null>(null);
 	let error = $state('');
+	let loading = $state(true);
 
 	let itemInput = $state('');
 	let itemExpected = $state('');
@@ -41,6 +42,7 @@
 	}
 
 	async function load() {
+		loading = true;
 		error = '';
 		try {
 			const pid = await projectId();
@@ -50,6 +52,8 @@
 			if (selectedRun) selectedRun = await getRun(API_BASE, t, pid, selectedRun.id);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'failed to load';
+		} finally {
+			loading = false;
 		}
 	}
 
@@ -94,8 +98,10 @@
 
 <a class="btn btn-ghost btn-sm mb-2" href="#/datasets">← Datasets</a>
 {#if error}<div class="alert alert-error text-sm mb-2">{error}</div>{/if}
-{#if !detail}
+{#if loading}
 	<div class="flex justify-center py-8"><span class="loading loading-spinner"></span></div>
+{:else if !detail}
+	<p class="text-sm opacity-60">Dataset not found.</p>
 {:else}
 	<div class="grid md:grid-cols-2 gap-4">
 		<div class="card bg-base-100 shadow">

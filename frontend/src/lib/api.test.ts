@@ -1,5 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { authHeaders, createProject, formatLatency, getMetrics, listProjects, login, parseError, tracesListUrl, tracesUrl } from './api';
+import { get } from 'svelte/store';
+import {
+	authHeaders,
+	createKey,
+	createProject,
+	currentOrgId,
+	formatLatency,
+	getMetrics,
+	listKeys,
+	listProjects,
+	login,
+	parseError,
+	revokeKey,
+	setOrg,
+	setProject,
+	setToken,
+	token,
+	tracesListUrl,
+	tracesUrl
+} from './api';
 
 describe('tracesUrl', () => {
 	it('builds base observations URL without params', () => {
@@ -127,5 +146,82 @@ describe('fetch wrappers', () => {
 			'http://api/api/v1/projects',
 			expect.objectContaining({ body: JSON.stringify({ name: 'P', organizationId: 'o' }) })
 		);
+	});
+
+	it('surfaces server validation messages on create', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: false,
+				status: 400,
+				text: () => Promise.resolve('{"error":"name is required"}'),
+				json: () => Promise.resolve({})
+			})
+		);
+		await expect(createProject('http://api', 'tok', '')).rejects.toThrow('name is required');
+	});
+});
+
+describe('session stores', () => {
+	beforeEach(() => {
+		localStorage.clear();
+		setToken(null);
+		setOrg(null);
+		setProject(null);
+	});
+
+	it('persists token/org/project across reloads and clears on logout', () => {
+		setToken('tok');
+		setOrg('org-1');
+		setProject('proj-1');
+		expect(get(token)).toBe('tok');
+		expect(get(currentOrgId)).toBe('org-1');
+		expect(localStorage.getItem('traceprompt.token')).toBe('tok');
+		expect(localStorage.getItem('traceprompt.orgId')).toBe('org-1');
+		expect(localStorage.getItem('traceprompt.projectId')).toBe('proj-1');
+
+		// Logout clears everything (App.svelte contract).
+		setToken(null);
+		setOrg(null);
+		setProject(null);
+		expect(get(token)).toBeNull();
+		expect(localStorage.getItem('traceprompt.token')).toBeNull();
+		expect(localStorage.getItem('traceprompt.orgId')).toBeNull();
+	});
+});
+
+describe('keys', () => {
+	beforeEach(() => {
+		vi.unstubAllGlobals();
+	});
+
+	it('listKeys unwraps data and createKey returns the one-time secret', async () => {
+		mockFetchOnce(200, { data: [{ id: 'k', name: 'ci', publicKey: 'pk', revokedAt: null }] });
+		const keys = await listKeys('http://api', 'tok', 'p');
+		expect(keys).toHaveLength(1);
+
+		mockFetchOnce(201, { id: 'k', secret: 'sk-secret' });
+		const created = await createKey('http://api', 'tok', 'p', 'ci');
+		expect(created.secret).toBe('sk-secret');
+	});
+
+	it('revokeKey posts to the revoke endpoint and surfaces errors', async () => {
+		mockFetchOnce(200, {});
+		await revokeKey('http://api', 'tok', 'p', 'k');
+		expect(fetch).toHaveBeenCalledWith(
+			'http://api/api/v1/projects/p/keys/k/revoke',
+			expect.objectContaining({ method: 'POST' })
+		);
+
+		vi.stubGlobal(
+			'fetch',
+			vi.fn().mockResolvedValue({
+				ok: false,
+				status: 404,
+				text: () => Promise.resolve('{"error":"key not found"}'),
+				json: () => Promise.resolve({})
+			})
+		);
+		await expect(revokeKey('http://api', 'tok', 'p', 'k')).rejects.toThrow('key not found');
 	});
 });

@@ -19,8 +19,10 @@
 	let backend = $state('checking…');
 	let metrics = $state<MetricsOverview | null>(null);
 	let error = $state('');
+	let loading = $state(true);
 
 	async function load(withProjects = true) {
+		loading = true;
 		error = '';
 		try {
 			backend = (await fetchHealth()).service;
@@ -30,8 +32,11 @@
 				setProject(projectId);
 			}
 			if (projectId) metrics = await getMetrics(API_BASE, get(token) ?? '', projectId);
+			else metrics = null;
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'failed to load';
+		} finally {
+			loading = false;
 		}
 	}
 
@@ -51,8 +56,10 @@
 </div>
 
 {#if error}<div class="alert alert-error text-sm mb-2">{error}</div>{/if}
-{#if !metrics}
+{#if loading}
 	<div class="flex justify-center py-8"><span class="loading loading-spinner"></span></div>
+{:else if !metrics}
+	<p class="text-sm opacity-60">No project selected — create one to see metrics.</p>
 {:else}
 	<div class="stats shadow stats-vertical sm:stats-horizontal w-full">
 		<div class="stat"><div class="stat-title">Traces</div><div class="stat-value text-2xl">{metrics.traces}</div></div>
