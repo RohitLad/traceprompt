@@ -2,6 +2,8 @@
 	import Router from 'svelte-spa-router';
 	import { setToken, token } from './lib/api';
 	import Dashboard from './pages/Dashboard.svelte';
+	import DatasetDetail from './pages/DatasetDetail.svelte';
+	import Datasets from './pages/Datasets.svelte';
 	import Keys from './pages/Keys.svelte';
 	import Login from './pages/Login.svelte';
 	import Projects from './pages/Projects.svelte';
@@ -16,7 +18,9 @@
 		'/keys': Keys,
 		'/traces': Traces,
 		'/traces/:traceId': TraceDetail,
-		'/prompts': Prompts
+		'/prompts': Prompts,
+		'/datasets': Datasets,
+		'/datasets/:id': DatasetDetail
 	};
 
 	function logout() {
@@ -34,6 +38,7 @@
 			<li><a href="#/">Dashboard</a></li>
 			<li><a href="#/traces">Traces</a></li>
 			<li><a href="#/prompts">Prompts</a></li>
+			<li><a href="#/datasets">Datasets</a></li>
 			{#if $token}
 				<li><a href="#/projects">Projects</a></li>
 				<li><a href="#/keys">Keys</a></li>

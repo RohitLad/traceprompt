@@ -72,6 +72,15 @@ func New(d *Deps) *fiber.App {
 	v1.Get("/projects/:id/prompts/:name", h.requireJWT, h.requireProjectMember, h.GetPrompt)
 	v1.Post("/projects/:id/prompts/:name/versions", h.requireJWT, h.requireProjectMember, h.CreatePromptVersion)
 	v1.Post("/projects/:id/prompts/:name/labels", h.requireJWT, h.requireProjectMember, h.SetPromptLabels)
+	v1.Get("/projects/:id/datasets", h.requireJWT, h.requireProjectMember, h.ListDatasets)
+	v1.Post("/projects/:id/datasets", h.requireJWT, h.requireProjectMember, h.CreateDataset)
+	v1.Get("/projects/:id/datasets/:did", h.requireJWT, h.requireProjectMember, h.GetDataset)
+	v1.Post("/projects/:id/datasets/:did/items", h.requireJWT, h.requireProjectMember, h.CreateDatasetItem)
+	v1.Post("/projects/:id/datasets/:did/runs", h.requireJWT, h.requireProjectMember, h.CreateDatasetRun)
+	v1.Get("/projects/:id/datasets/:did/runs", h.requireJWT, h.requireProjectMember, h.ListDatasetRuns)
+	v1.Get("/projects/:id/runs/:runId", h.requireJWT, h.requireProjectMember, h.GetDatasetRun)
+	v1.Post("/projects/:id/runs/:runId/items", h.requireJWT, h.requireProjectMember, h.LinkRunItem)
+	v1.Get("/projects/:id/metrics/overview", h.requireJWT, h.requireProjectMember, h.MetricsOverview)
 
 	// Public API (BasicAuth pk:sk, Langfuse-compatible).
 	pub := app.Group("/api/public", h.requireAPIKey)
@@ -82,6 +91,8 @@ func New(d *Deps) *fiber.App {
 	pub.Post("/scores", h.CreateScore)
 	pub.Get("/v3/scores", h.ListScoresV3)
 	pub.Get("/prompts/:name", h.GetPublicPrompt)
+	pub.Get("/datasets", h.ListPublicDatasets)
+	pub.Get("/datasets/:name", h.GetPublicDataset)
 
 	return app
 }

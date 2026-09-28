@@ -174,6 +174,41 @@ type PromptMessage struct {
 	Content string `json:"content"`
 }
 
+// Dataset is a versioned test set for experiments (prompts/models eval).
+type Dataset struct {
+	Base
+	ProjectID   uuid.UUID `gorm:"uniqueIndex:idx_datasets_project_name,priority:1;not null" json:"projectId"`
+	Name        string    `gorm:"uniqueIndex:idx_datasets_project_name,priority:2;not null" json:"name"`
+	Description *string   `json:"description"`
+}
+
+// DatasetItem is one test case: input, expected output, and metadata.
+type DatasetItem struct {
+	Base
+	DatasetID      uuid.UUID      `gorm:"index;not null" json:"datasetId"`
+	Input          *string        `gorm:"type:text" json:"input"`
+	ExpectedOutput *string        `gorm:"type:text" json:"expectedOutput"`
+	Metadata       map[string]any `gorm:"serializer:json;type:jsonb" json:"metadata"`
+}
+
+// DatasetRun is one execution of an app against dataset items.
+type DatasetRun struct {
+	Base
+	DatasetID   uuid.UUID      `gorm:"index;not null" json:"datasetId"`
+	Name        string         `gorm:"index;not null" json:"name"`
+	Description *string        `json:"description"`
+	Metadata    map[string]any `gorm:"serializer:json;type:jsonb" json:"metadata"`
+}
+
+// DatasetRunItem links one item to the trace it produced in a run.
+// Unique per (run, item): re-running an item updates its trace link.
+type DatasetRunItem struct {
+	Base
+	RunID   uuid.UUID `gorm:"uniqueIndex:idx_run_items,priority:1;not null" json:"runId"`
+	ItemID  uuid.UUID `gorm:"uniqueIndex:idx_run_items,priority:2;not null" json:"itemId"`
+	TraceID *string   `gorm:"index" json:"traceId"`
+}
+
 // AuthModels are migrated first and work on SQLite (tests) and Postgres.
 func AuthModels() []any {
 	return []any{&Organization{}, &User{}, &Membership{}, &Project{}, &ApiKey{}}
@@ -182,5 +217,9 @@ func AuthModels() []any {
 // AllModels lists every GORM model for AutoMigrate in dev/test.
 // Production should use versioned SQL migrations (see migrations/).
 func AllModels() []any {
-	return append(AuthModels(), &Trace{}, &Observation{}, &Score{}, &Prompt{}, &PromptVersion{})
+	return append(AuthModels(),
+		&Trace{}, &Observation{}, &Score{},
+		&Prompt{}, &PromptVersion{},
+		&Dataset{}, &DatasetItem{}, &DatasetRun{}, &DatasetRunItem{},
+	)
 }

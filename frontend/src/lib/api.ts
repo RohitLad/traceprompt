@@ -229,6 +229,119 @@ export async function setPromptLabels(
 	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
 }
 
+export interface DatasetSummary {
+	id: string;
+	name: string;
+	description?: string | null;
+	itemCount: number;
+	runCount: number;
+}
+
+export interface DatasetItem {
+	id: string;
+	input?: string | null;
+	expectedOutput?: string | null;
+}
+
+export interface DatasetDetail extends DatasetSummary {
+	items: DatasetItem[];
+}
+
+export interface DatasetRun {
+	id: string;
+	name: string;
+	itemCount: number;
+}
+
+async function reqJSON(base: string, t: string, path: string, method = 'GET', payload?: unknown) {
+	const res = await fetch(`${base}${path}`, {
+		method,
+		headers: { 'Content-Type': 'application/json', ...authHeaders(t) },
+		body: payload === undefined ? undefined : JSON.stringify(payload)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return (await res.json()) as { data: never };
+}
+
+export async function listDatasets(base: string, t: string, projectId: string): Promise<DatasetSummary[]> {
+	const out = await reqJSON(base, t, `/api/v1/projects/${projectId}/datasets`);
+	return (out.data ?? []) as DatasetSummary[];
+}
+
+export async function createDataset(base: string, t: string, projectId: string, name: string): Promise<void> {
+	await reqJSON(base, t, `/api/v1/projects/${projectId}/datasets`, 'POST', { name });
+}
+
+export async function getDataset(base: string, t: string, projectId: string, id: string): Promise<DatasetDetail> {
+	const out = await reqJSON(base, t, `/api/v1/projects/${projectId}/datasets/${id}`);
+	return out.data as DatasetDetail;
+}
+
+export async function addDatasetItem(
+	base: string,
+	t: string,
+	projectId: string,
+	datasetId: string,
+	input: string,
+	expectedOutput: string
+): Promise<void> {
+	await reqJSON(base, t, `/api/v1/projects/${projectId}/datasets/${datasetId}/items`, 'POST', {
+		input,
+		expectedOutput
+	});
+}
+
+export async function listRuns(base: string, t: string, projectId: string, datasetId: string): Promise<DatasetRun[]> {
+	const out = await reqJSON(base, t, `/api/v1/projects/${projectId}/datasets/${datasetId}/runs`);
+	return (out.data ?? []) as DatasetRun[];
+}
+
+export async function createRun(base: string, t: string, projectId: string, datasetId: string, name: string): Promise<void> {
+	await reqJSON(base, t, `/api/v1/projects/${projectId}/datasets/${datasetId}/runs`, 'POST', { name });
+}
+
+export interface RunDetail {
+	id: string;
+	name: string;
+	items: { itemId: string; traceId?: string | null; traceName?: string | null }[];
+}
+
+export async function getRun(base: string, t: string, projectId: string, runId: string): Promise<RunDetail> {
+	const out = await reqJSON(base, t, `/api/v1/projects/${projectId}/runs/${runId}`);
+	return out.data as RunDetail;
+}
+
+export async function linkRunItem(
+	base: string,
+	t: string,
+	projectId: string,
+	runId: string,
+	itemId: string,
+	traceId: string
+): Promise<void> {
+	await reqJSON(base, t, `/api/v1/projects/${projectId}/runs/${runId}/items`, 'POST', { itemId, traceId });
+}
+
+export interface MetricsOverview {
+	days: number;
+	traces: number;
+	observations: number;
+	inputTokens: number;
+	outputTokens: number;
+	avgLatencyMs?: number | null;
+	perDay: { date: string; traces: number; observations: number }[];
+	byModel: { model: string; observations: number; inputTokens: number; outputTokens: number }[];
+	truncated: boolean;
+}
+
+export async function getMetrics(base: string, t: string, projectId: string, days = 30): Promise<MetricsOverview> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/metrics/overview?days=${days}`, {
+		headers: authHeaders(t)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return ((await res.json()) as { data: MetricsOverview }).data;
+}
+
 export function parseError(text: string, status: number): string {
 	try {
 		const body = JSON.parse(text) as { error?: string };
