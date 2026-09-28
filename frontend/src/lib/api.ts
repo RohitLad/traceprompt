@@ -342,6 +342,75 @@ export async function getMetrics(base: string, t: string, projectId: string, day
 	return ((await res.json()) as { data: MetricsOverview }).data;
 }
 
+export interface PlaygroundResult {
+	output: string;
+	model: string;
+	inputTokens: number;
+	outputTokens: number;
+	totalTokens: number;
+	latencyMs: number;
+	traceId?: string | null;
+}
+
+// runPlayground proxies a template through the backend. The provider key is
+// request-scoped: it is never persisted server-side (nor in localStorage —
+// kept in component state only).
+export async function runPlayground(
+	base: string,
+	t: string,
+	projectId: string,
+	payload: {
+		template?: string;
+		promptName?: string;
+		variables: Record<string, string>;
+		provider: { baseUrl: string; apiKey: string; model: string };
+		saveAsTrace?: boolean;
+	}
+): Promise<PlaygroundResult> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/playground/run`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json', ...authHeaders(t) },
+		body: JSON.stringify(payload)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return ((await res.json()) as { data: PlaygroundResult }).data;
+}
+
+export interface Session {
+	sessionId: string;
+	traceCount: number;
+	lastTraceAt: string;
+}
+
+export async function listSessions(base: string, t: string, projectId: string): Promise<Session[]> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/sessions`, { headers: authHeaders(t) });
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return (((await res.json()) as { data: Session[] }).data ?? []);
+}
+
+export interface ScoreRow {
+	traceId: string;
+	observationId?: string | null;
+	name: string;
+	value: number | string | boolean | null;
+	dataType: string;
+	comment?: string | null;
+}
+
+export async function listScores(
+	base: string,
+	t: string,
+	projectId: string,
+	params: { traceId?: string; name?: string } = {}
+): Promise<ScoreRow[]> {
+	const q = new URLSearchParams();
+	if (params.traceId) q.set('traceId', params.traceId);
+	if (params.name) q.set('name', params.name);
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/scores?${q}`, { headers: authHeaders(t) });
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	return (((await res.json()) as { data: ScoreRow[] }).data ?? []);
+}
+
 export function parseError(text: string, status: number): string {
 	try {
 		const body = JSON.parse(text) as { error?: string };

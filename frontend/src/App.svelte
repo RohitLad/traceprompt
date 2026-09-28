@@ -6,8 +6,11 @@
 	import Datasets from './pages/Datasets.svelte';
 	import Keys from './pages/Keys.svelte';
 	import Login from './pages/Login.svelte';
+	import Playground from './pages/Playground.svelte';
 	import Projects from './pages/Projects.svelte';
 	import Prompts from './pages/Prompts.svelte';
+	import Scores from './pages/Scores.svelte';
+	import Sessions from './pages/Sessions.svelte';
 	import TraceDetail from './pages/TraceDetail.svelte';
 	import Traces from './pages/Traces.svelte';
 
@@ -18,7 +21,10 @@
 		'/keys': Keys,
 		'/traces': Traces,
 		'/traces/:traceId': TraceDetail,
+		'/sessions': Sessions,
+		'/scores': Scores,
 		'/prompts': Prompts,
+		'/playground': Playground,
 		'/datasets': Datasets,
 		'/datasets/:id': DatasetDetail
 	};
@@ -37,7 +43,10 @@
 		<ul class="menu menu-horizontal px-1">
 			<li><a href="#/">Dashboard</a></li>
 			<li><a href="#/traces">Traces</a></li>
+			<li><a href="#/sessions">Sessions</a></li>
+			<li><a href="#/scores">Scores</a></li>
 			<li><a href="#/prompts">Prompts</a></li>
+			<li><a href="#/playground">Playground</a></li>
 			<li><a href="#/datasets">Datasets</a></li>
 			{#if $token}
 				<li><a href="#/projects">Projects</a></li>

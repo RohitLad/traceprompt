@@ -81,6 +81,10 @@ func New(d *Deps) *fiber.App {
 	v1.Get("/projects/:id/runs/:runId", h.requireJWT, h.requireProjectMember, h.GetDatasetRun)
 	v1.Post("/projects/:id/runs/:runId/items", h.requireJWT, h.requireProjectMember, h.LinkRunItem)
 	v1.Get("/projects/:id/metrics/overview", h.requireJWT, h.requireProjectMember, h.MetricsOverview)
+	v1.Post("/projects/:id/playground/run", h.requireJWT, h.requireProjectMember, h.PlaygroundRun)
+	v1.Get("/projects/:id/sessions", h.requireJWT, h.requireProjectMember, h.ListSessionsUI)
+	v1.Get("/projects/:id/sessions/:sid/traces", h.requireJWT, h.requireProjectMember, h.ListSessionTracesUI)
+	v1.Get("/projects/:id/scores", h.requireJWT, h.requireProjectMember, h.ListScoresUI)
 
 	// Public API (BasicAuth pk:sk, Langfuse-compatible).
 	pub := app.Group("/api/public", h.requireAPIKey)
