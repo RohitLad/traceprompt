@@ -9,7 +9,7 @@ import (
 )
 
 func TestHealth(t *testing.T) {
-	app := New()
+	app := New(nil)
 
 	req, _ := http.NewRequest(http.MethodGet, "/api/health", nil)
 	resp, err := app.Test(req, -1)
@@ -17,22 +17,11 @@ func TestHealth(t *testing.T) {
 	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "application/json", resp.Header.Get("Content-Type")[:16])
-}
-
-func TestPublicProjectsStub(t *testing.T) {
-	app := New()
-
-	req, _ := http.NewRequest(http.MethodGet, "/api/public/projects", nil)
-	resp, err := app.Test(req, -1)
-	require.NoError(t, err)
-	defer resp.Body.Close()
-
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Contains(t, resp.Header.Get("Content-Type"), "application/json")
 }
 
 func TestNotFoundJSON(t *testing.T) {
-	app := New()
+	app := New(nil)
 
 	req, _ := http.NewRequest(http.MethodGet, "/nope", nil)
 	resp, err := app.Test(req, -1)

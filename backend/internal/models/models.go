@@ -8,6 +8,8 @@ import (
 )
 
 // Base provides UUID primary key + timestamps for all tables.
+// IDs are UUIDs internally; Langfuse-compatible external IDs
+// (traceId, observationId, pk-lf-...) live on dedicated columns.
 type Base struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	CreatedAt time.Time `json:"createdAt"`
@@ -22,23 +24,68 @@ func (b *Base) BeforeCreate(_ *gorm.DB) error {
 	return nil
 }
 
-// Project scopes all observability data. Mirrors Langfuse project.
-type Project struct {
+// Organization groups users and projects.
+type Organization struct {
 	Base
 	Name string `gorm:"not null" json:"name"`
 }
 
+// User is a human login. Passwords are bcrypt hashes, never returned.
+type User struct {
+	Base
+	Email        string `gorm:"uniqueIndex;not null" json:"email"`
+	Name         string `gorm:"not null" json:"name"`
+	PasswordHash string `gorm:"not null" json:"-"`
+}
+
+// Membership links a user to an organization with a role.
+type Membership struct {
+	Base
+	UserID         uuid.UUID `gorm:"uniqueIndex:idx_membership;not null" json:"userId"`
+	OrganizationID uuid.UUID `gorm:"uniqueIndex:idx_membership;not null" json:"organizationId"`
+	Role           string    `gorm:"not null;default:member" json:"role"` // owner|member
+}
+
+// Project scopes all observability data. Mirrors Langfuse project.
+type Project struct {
+	Base
+	OrganizationID uuid.UUID `gorm:"index;not null" json:"organizationId"`
+	Name           string    `gorm:"not null" json:"name"`
+}
+
+// ApiKey authenticates SDK/public-API callers via BasicAuth pk:sk.
+// Only a SHA-256 hash of the secret is stored; the raw secret is
+// shown once at creation time (Langfuse behavior).
+type ApiKey struct {
+	Base
+	ProjectID  uuid.UUID  `gorm:"index;not null" json:"projectId"`
+	Name       string     `gorm:"not null" json:"name"`
+	PublicKey  string     `gorm:"uniqueIndex;not null" json:"publicKey"`
+	SecretHash string     `gorm:"not null" json:"-"`
+	CreatedBy  *uuid.UUID `json:"createdBy"`
+	RevokedAt  *time.Time `gorm:"index" json:"revokedAt"`
+}
+
+// Revoked reports whether the key can no longer authenticate.
+func (k *ApiKey) Revoked() bool {
+	return k.RevokedAt != nil
+}
+
 // Trace is a single request/operation grouping observations.
 // Field names follow Langfuse public API (camelCase JSON) for SDK compat.
+//
+// NOTE: Metadata/Tags use GORM serializer:json so the same models run on
+// Postgres (jsonb) and SQLite (text) in tests. If tag filtering needs GIN
+// indexes at scale, migrate Tags to text[] in a versioned migration.
 type Trace struct {
 	Base
-	ProjectID string    `gorm:"index:idx_traces_project_time,priority:1;not null" json:"projectId"`
-	TraceID   string    `gorm:"uniqueIndex;not null" json:"traceId"`
-	Name      string    `gorm:"index" json:"name"`
-	UserID    *string   `gorm:"index" json:"userId"`
-	SessionID *string   `gorm:"index" json:"sessionId"`
-	Metadata  JSONMap   `gorm:"type:jsonb;default:'{}'" json:"metadata"`
-	Tags      StringArr `gorm:"type:text[]" json:"tags"`
+	ProjectID uuid.UUID      `gorm:"index:idx_traces_project_time,priority:1;not null" json:"projectId"`
+	TraceID   string         `gorm:"uniqueIndex;not null" json:"traceId"`
+	Name      string         `gorm:"index" json:"name"`
+	UserID    *string        `gorm:"index" json:"userId"`
+	SessionID *string        `gorm:"index" json:"sessionId"`
+	Metadata  map[string]any `gorm:"serializer:json;type:jsonb" json:"metadata"`
+	Tags      []string       `gorm:"serializer:json" json:"tags"`
 }
 
 // ObservationType mirrors Langfuse observation types.
@@ -60,7 +107,7 @@ const (
 // Observation is one step inside a trace (LLM call, tool, retrieval...).
 type Observation struct {
 	Base
-	ProjectID       string          `gorm:"index:idx_obs_project_time,priority:1;not null" json:"projectId"`
+	ProjectID       uuid.UUID       `gorm:"index:idx_obs_project_time,priority:1;not null" json:"projectId"`
 	TraceID         string          `gorm:"index:idx_obs_trace,priority:1;not null" json:"traceId"`
 	ObservationID   string          `gorm:"uniqueIndex;not null" json:"observationId"`
 	ParentID        *string         `gorm:"index" json:"parentObservationId"`
@@ -68,11 +115,11 @@ type Observation struct {
 	Name            string          `gorm:"index" json:"name"`
 	StartTime       time.Time       `gorm:"index:idx_obs_project_time,priority:2;not null" json:"startTime"`
 	EndTime         *time.Time      `json:"endTime"`
-	Input           *string         `gorm:"type:jsonb" json:"input"`
-	Output          *string         `gorm:"type:jsonb" json:"output"`
-	Metadata        JSONMap         `gorm:"type:jsonb;default:'{}'" json:"metadata"`
+	Input           *string         `gorm:"type:text" json:"input"`
+	Output          *string         `gorm:"type:text" json:"output"`
+	Metadata        map[string]any  `gorm:"serializer:json;type:jsonb" json:"metadata"`
 	Model           *string         `gorm:"index" json:"model"`
-	ModelParameters JSONMap         `gorm:"type:jsonb;default:'{}'" json:"modelParameters"`
+	ModelParameters map[string]any  `gorm:"serializer:json;type:jsonb" json:"modelParameters"`
 	UsageInput      *int            `json:"inputUsage"`
 	UsageOutput     *int            `json:"outputUsage"`
 	UsageTotal      *int            `json:"totalUsage"`
@@ -86,20 +133,25 @@ type Observation struct {
 // Score attaches evaluation/human feedback to a trace or observation.
 type Score struct {
 	Base
-	ProjectID     string   `gorm:"index;not null" json:"projectId"`
-	TraceID       string   `gorm:"index;not null" json:"traceId"`
-	ObservationID *string  `gorm:"index" json:"observationId"`
-	SessionID     *string  `gorm:"index" json:"sessionId"`
-	Name          string   `gorm:"index;not null" json:"name"`
-	ValueNum      *float64 `json:"valueNum"`
-	ValueStr      *string  `json:"valueStr"`
-	DataType      string   `gorm:"not null" json:"dataType"` // NUMERIC|CATEGORICAL|BOOLEAN|TEXT|CORRECTION
-	Source        string   `gorm:"not null;default:API" json:"source"`
-	Comment       *string  `json:"comment"`
+	ProjectID     uuid.UUID `gorm:"index;not null" json:"projectId"`
+	TraceID       string    `gorm:"index;not null" json:"traceId"`
+	ObservationID *string   `gorm:"index" json:"observationId"`
+	SessionID     *string   `gorm:"index" json:"sessionId"`
+	Name          string    `gorm:"index;not null" json:"name"`
+	ValueNum      *float64  `json:"valueNum"`
+	ValueStr      *string   `json:"valueStr"`
+	DataType      string    `gorm:"not null" json:"dataType"` // NUMERIC|CATEGORICAL|BOOLEAN|TEXT|CORRECTION
+	Source        string    `gorm:"not null;default:API" json:"source"`
+	Comment       *string   `json:"comment"`
+}
+
+// AuthModels are migrated first and work on SQLite (tests) and Postgres.
+func AuthModels() []any {
+	return []any{&Organization{}, &User{}, &Membership{}, &Project{}, &ApiKey{}}
 }
 
 // AllModels lists every GORM model for AutoMigrate in dev/test.
 // Production should use versioned SQL migrations (see migrations/).
 func AllModels() []any {
-	return []any{&Project{}, &Trace{}, &Observation{}, &Score{}}
+	return append(AuthModels(), &Trace{}, &Observation{}, &Score{})
 }

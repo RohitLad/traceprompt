@@ -6,11 +6,18 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"gorm.io/gorm"
 )
 
+// Deps are injected by main; tests supply SQLite + fixed secret.
+type Deps struct {
+	DB        *gorm.DB
+	JWTSecret string
+}
+
 // New builds the Fiber app with production-safe middleware.
-// DB/queue are injected later per-route; health stays dependency-free.
-func New() *fiber.App {
+// Pass nil Deps to get a dependency-free app (health only, used by smoke tests).
+func New(d *Deps) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "traceprompt",
 		ServerHeader: "traceprompt",
@@ -35,11 +42,27 @@ func New() *fiber.App {
 		return c.JSON(fiber.Map{"status": "ok", "service": "traceprompt"})
 	})
 
-	api := app.Group("/api/public")
-	api.Get("/projects", func(c *fiber.Ctx) error {
-		// Stub until Phase 1 auth lands; keeps SDK health-checks green.
-		return c.JSON(fiber.Map{"data": []any{}})
-	})
+	if d == nil || d.DB == nil {
+		return app
+	}
+
+	h := &Handler{db: d.DB, jwtSecret: d.JWTSecret}
+
+	// UI API (JWT session auth).
+	v1 := app.Group("/api/v1")
+	v1.Post("/auth/register", h.Register)
+	v1.Post("/auth/login", h.Login)
+	v1.Get("/me", h.requireJWT, h.Me)
+	v1.Get("/projects", h.requireJWT, h.ListProjects)
+	v1.Post("/projects", h.requireJWT, h.CreateProject)
+	v1.Get("/projects/:id", h.requireJWT, h.requireProjectMember, h.GetProject)
+	v1.Get("/projects/:id/keys", h.requireJWT, h.requireProjectMember, h.ListKeys)
+	v1.Post("/projects/:id/keys", h.requireJWT, h.requireProjectMember, h.CreateKey)
+	v1.Post("/projects/:id/keys/:keyId/revoke", h.requireJWT, h.requireProjectMember, h.RevokeKey)
+
+	// Public API (BasicAuth pk:sk, Langfuse-compatible).
+	pub := app.Group("/api/public", h.requireAPIKey)
+	pub.Get("/projects", h.PublicProjects)
 
 	return app
 }
