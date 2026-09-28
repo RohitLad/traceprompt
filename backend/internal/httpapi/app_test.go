@@ -1,0 +1,43 @@
+package httpapi
+
+import (
+	"net/http"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestHealth(t *testing.T) {
+	app := New()
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/health", nil)
+	resp, err := app.Test(req, -1)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "application/json", resp.Header.Get("Content-Type")[:16])
+}
+
+func TestPublicProjectsStub(t *testing.T) {
+	app := New()
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/public/projects", nil)
+	resp, err := app.Test(req, -1)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestNotFoundJSON(t *testing.T) {
+	app := New()
+
+	req, _ := http.NewRequest(http.MethodGet, "/nope", nil)
+	resp, err := app.Test(req, -1)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
