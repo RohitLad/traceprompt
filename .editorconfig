@@ -1,0 +1,22 @@
+# EditorConfig — shared formatting baseline (editors + agents).
+# Go is governed by gofmt/gofumpt; this covers everything else.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{js,ts,svelte,json,yml,yaml}]
+indent_style = space
+indent_size = 2
+
+[*.{go,sql}]
+indent_style = tab
+
+[Makefile]
+indent_style = tab
+
+[*.md]
+trim_trailing_whitespace = false
