@@ -131,9 +131,11 @@ type Observation struct {
 }
 
 // Score attaches evaluation/human feedback to a trace or observation.
+// ExternalID carries the SDK-provided score id for idempotent upserts.
 type Score struct {
 	Base
 	ProjectID     uuid.UUID `gorm:"index;not null" json:"projectId"`
+	ExternalID    *string   `gorm:"uniqueIndex" json:"externalId"`
 	TraceID       string    `gorm:"index;not null" json:"traceId"`
 	ObservationID *string   `gorm:"index" json:"observationId"`
 	SessionID     *string   `gorm:"index" json:"sessionId"`

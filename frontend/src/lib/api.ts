@@ -85,6 +85,68 @@ export async function listProjects(base: string, t: string): Promise<Project[]> 
 	return body.data ?? [];
 }
 
+export interface UITrace {
+	traceId: string;
+	name: string;
+	userId?: string | null;
+	sessionId?: string | null;
+	tags: string[];
+	observationCount: number;
+}
+
+export interface UIObservation {
+	observationId?: string;
+	id: string;
+	traceId: string;
+	type: string;
+	name: string;
+	startTime: string;
+	endTime?: string | null;
+	input?: string | null;
+	output?: string | null;
+	model?: string | null;
+	inputUsage?: number | null;
+	outputUsage?: number | null;
+	totalUsage?: number | null;
+	level: string;
+	statusMessage?: string | null;
+}
+
+export function tracesListUrl(base: string, projectId: string, limit = 25, cursor?: string): string {
+	const q = new URLSearchParams({ limit: String(limit) });
+	if (cursor) q.set('cursor', cursor);
+	return `${base}/api/v1/projects/${projectId}/traces?${q}`;
+}
+
+export async function listTraces(
+	base: string,
+	t: string,
+	projectId: string,
+	limit = 25,
+	cursor?: string
+): Promise<{ data: UITrace[]; cursor: string | null }> {
+	const res = await fetch(tracesListUrl(base, projectId, limit, cursor), { headers: authHeaders(t) });
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	const body = (await res.json()) as { data: UITrace[]; meta: { cursor: string | null } };
+	return { data: body.data ?? [], cursor: body.meta?.cursor ?? null };
+}
+
+export async function getTrace(
+	base: string,
+	t: string,
+	projectId: string,
+	traceId: string
+): Promise<{ name: string; userId?: string | null; observations: UIObservation[] }> {
+	const res = await fetch(`${base}/api/v1/projects/${projectId}/traces/${traceId}`, {
+		headers: authHeaders(t)
+	});
+	if (!res.ok) throw new Error(parseError(await res.text(), res.status));
+	const body = (await res.json()) as {
+		data: { name: string; userId?: string | null; observations: UIObservation[] };
+	};
+	return body.data;
+}
+
 export function parseError(text: string, status: number): string {
 	try {
 		const body = JSON.parse(text) as { error?: string };

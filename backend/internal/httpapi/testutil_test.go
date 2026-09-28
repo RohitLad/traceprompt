@@ -15,14 +15,16 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/traceprompt/traceprompt/backend/internal/models"
+	"github.com/traceprompt/traceprompt/backend/internal/queue"
 )
 
 const testJWTSecret = "test-secret-32-chars-minimum-xyz!"
 
-// fiberApp bundles the Fiber app with its test database.
+// fiberApp bundles the Fiber app with its test database and queue.
 type fiberApp struct {
-	app *fiber.App
-	db  *gorm.DB
+	app   *fiber.App
+	db    *gorm.DB
+	queue *queue.Memory
 }
 
 // newTestApp spins up an isolated in-memory SQLite app per test.
@@ -35,7 +37,8 @@ func newTestApp(t *testing.T) *fiberApp {
 	// Isolate: drop + recreate (shared cache reuses the same DB across tests).
 	require.NoError(t, db.Migrator().DropTable(models.AllModels()...))
 	require.NoError(t, db.AutoMigrate(models.AllModels()...))
-	return &fiberApp{app: New(&Deps{DB: db, JWTSecret: testJWTSecret}), db: db}
+	mem := queue.NewMemory()
+	return &fiberApp{app: New(&Deps{DB: db, JWTSecret: testJWTSecret, Queue: mem}), db: db, queue: mem}
 }
 
 func doRequest(t *testing.T, app *fiberApp, method, path string, body any, headers map[string]string) (int, map[string]any) {

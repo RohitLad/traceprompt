@@ -11,12 +11,14 @@ import (
 
 	"github.com/traceprompt/traceprompt/backend/internal/auth"
 	"github.com/traceprompt/traceprompt/backend/internal/models"
+	"github.com/traceprompt/traceprompt/backend/internal/queue"
 )
 
 // Handler holds request-scoped dependencies.
 type Handler struct {
 	db        *gorm.DB
 	jwtSecret string
+	queue     queue.Queue
 }
 
 const (

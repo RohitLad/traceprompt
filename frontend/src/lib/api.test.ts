@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { authHeaders, formatLatency, parseError, tracesUrl } from './api';
+import { authHeaders, formatLatency, parseError, tracesListUrl, tracesUrl } from './api';
 
 describe('tracesUrl', () => {
 	it('builds base observations URL without params', () => {
@@ -35,5 +35,12 @@ describe('parseError', () => {
 
 	it('falls back to status', () => {
 		expect(parseError('not json', 500)).toBe('request failed (500)');
+	});
+});
+
+describe('tracesListUrl', () => {
+	it('builds UI traces URL with cursor', () => {
+		const url = tracesListUrl('http://api', 'pid-1', 10, 'cur');
+		expect(url).toBe('http://api/api/v1/projects/pid-1/traces?limit=10&cursor=cur');
 	});
 });

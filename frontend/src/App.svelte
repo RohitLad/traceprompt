@@ -6,6 +6,7 @@
 	import Login from './pages/Login.svelte';
 	import Projects from './pages/Projects.svelte';
 	import Prompts from './pages/Prompts.svelte';
+	import TraceDetail from './pages/TraceDetail.svelte';
 	import Traces from './pages/Traces.svelte';
 
 	const routes = {
@@ -14,6 +15,7 @@
 		'/projects': Projects,
 		'/keys': Keys,
 		'/traces': Traces,
+		'/traces/:traceId': TraceDetail,
 		'/prompts': Prompts
 	};
 

@@ -1,18 +1,50 @@
 // Command worker drains the Redis ingestion stream and writes to Postgres.
-// Phase 0 stub: blocks on signal so docker compose stays green before Phase 2 lands.
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"github.com/traceprompt/traceprompt/backend/internal/config"
+	"github.com/traceprompt/traceprompt/backend/internal/db"
+	"github.com/traceprompt/traceprompt/backend/internal/ingest"
+	"github.com/traceprompt/traceprompt/backend/internal/models"
+	"github.com/traceprompt/traceprompt/backend/internal/queue"
+	"github.com/traceprompt/traceprompt/backend/internal/worker"
 )
 
 func main() {
-	log.Println("traceprompt worker starting (stub, Phase 2 implements drain loop)")
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	log.Println("worker stopped")
+	cfg := config.Load()
+
+	gdb, err := db.Open(cfg.DatabaseURL, false)
+	if err != nil {
+		log.Fatalf("worker: database: %v", err)
+	}
+	if err := gdb.AutoMigrate(models.AllModels()...); err != nil {
+		// Harmless when tables exist; versioned migrations replace this later.
+		log.Printf("worker: automigrate: %v", err)
+	}
+
+	rq, err := queue.NewRedis(cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("worker: redis: %v", err)
+	}
+	defer rq.Close()
+
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	hostname, _ := os.Hostname()
+	if hostname == "" {
+		hostname = "worker"
+	}
+	consumer := hostname + "-" + time.Now().Format("150405")
+	log.Printf("worker: consuming %s as %s", queue.Stream, consumer)
+	if err := worker.RunRedis(ctx, rq, ingest.NewStore(gdb), consumer); err != nil {
+		log.Printf("worker stopped: %v", err)
+	}
 }

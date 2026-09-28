@@ -7,12 +7,15 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"gorm.io/gorm"
+
+	"github.com/traceprompt/traceprompt/backend/internal/queue"
 )
 
-// Deps are injected by main; tests supply SQLite + fixed secret.
+// Deps are injected by main; tests supply SQLite + memory queue + fixed secret.
 type Deps struct {
 	DB        *gorm.DB
 	JWTSecret string
+	Queue     queue.Queue
 }
 
 // New builds the Fiber app with production-safe middleware.
@@ -45,8 +48,11 @@ func New(d *Deps) *fiber.App {
 	if d == nil || d.DB == nil {
 		return app
 	}
-
-	h := &Handler{db: d.DB, jwtSecret: d.JWTSecret}
+	q := d.Queue
+	if q == nil {
+		q = queue.NewMemory() // tests may omit; handlers stay functional
+	}
+	h := &Handler{db: d.DB, jwtSecret: d.JWTSecret, queue: q}
 
 	// UI API (JWT session auth).
 	v1 := app.Group("/api/v1")
@@ -59,10 +65,16 @@ func New(d *Deps) *fiber.App {
 	v1.Get("/projects/:id/keys", h.requireJWT, h.requireProjectMember, h.ListKeys)
 	v1.Post("/projects/:id/keys", h.requireJWT, h.requireProjectMember, h.CreateKey)
 	v1.Post("/projects/:id/keys/:keyId/revoke", h.requireJWT, h.requireProjectMember, h.RevokeKey)
+	v1.Get("/projects/:id/traces", h.requireJWT, h.requireProjectMember, h.ListTracesUI)
+	v1.Get("/projects/:id/traces/:traceId", h.requireJWT, h.requireProjectMember, h.GetTraceUI)
 
 	// Public API (BasicAuth pk:sk, Langfuse-compatible).
 	pub := app.Group("/api/public", h.requireAPIKey)
 	pub.Get("/projects", h.PublicProjects)
+	pub.Post("/ingestion", h.Ingestion)
+	pub.Get("/v2/observations", h.ListObservationsV2)
+	pub.Post("/scores", h.CreateScore)
+	pub.Get("/v3/scores", h.ListScoresV3)
 
 	return app
 }

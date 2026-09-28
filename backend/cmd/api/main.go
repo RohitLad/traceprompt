@@ -1,8 +1,9 @@
 package main
 
 import (
+	"context"
 	"log"
-	"os"
+	"log/slog"
 	"os/signal"
 	"syscall"
 	"time"
@@ -12,14 +13,17 @@ import (
 	"github.com/traceprompt/traceprompt/backend/internal/config"
 	"github.com/traceprompt/traceprompt/backend/internal/db"
 	"github.com/traceprompt/traceprompt/backend/internal/httpapi"
+	"github.com/traceprompt/traceprompt/backend/internal/ingest"
 	"github.com/traceprompt/traceprompt/backend/internal/models"
+	"github.com/traceprompt/traceprompt/backend/internal/queue"
+	"github.com/traceprompt/traceprompt/backend/internal/worker"
 )
 
 func main() {
 	cfg := config.Load()
 
 	// Connect with retries so `docker compose up` ordering races resolve.
-	var gdb, err = connectWithRetry(cfg.DatabaseURL, cfg.Env == "development")
+	gdb, err := connectWithRetry(cfg.DatabaseURL, cfg.Env == "development")
 	if err != nil {
 		log.Printf("warning: database unavailable, serving health only: %v", err)
 		gdb = nil
@@ -30,17 +34,18 @@ func main() {
 		}
 	}
 
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	var deps *httpapi.Deps
 	if gdb != nil {
-		deps = &httpapi.Deps{DB: gdb, JWTSecret: cfg.JWTSecret}
+		q := resolveQueue(ctx, cfg.RedisURL, gdb)
+		deps = &httpapi.Deps{DB: gdb, JWTSecret: cfg.JWTSecret, Queue: q}
 	}
 	app := httpapi.New(deps)
 
-	// Graceful shutdown so in-flight ingestion batches complete.
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-quit
+		<-ctx.Done()
 		log.Println("shutting down...")
 		if err := app.Shutdown(); err != nil {
 			log.Printf("shutdown error: %v", err)
@@ -51,6 +56,24 @@ func main() {
 	if err := app.Listen(cfg.Addr()); err != nil {
 		log.Printf("server closed: %v", err)
 	}
+}
+
+// resolveQueue prefers Redis; without it (local dev) it falls back to an
+// in-memory queue drained inline so single-binary runs still ingest.
+func resolveQueue(ctx context.Context, redisURL string, gdb *gorm.DB) queue.Queue {
+	rq, err := queue.NewRedis(redisURL)
+	if err != nil {
+		return queue.NewMemory()
+	}
+	pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	if err := rq.Client().Ping(pingCtx).Err(); err != nil {
+		slog.Warn("redis unreachable, using in-memory queue (dev fallback)", "err", err)
+		mem := queue.NewMemory()
+		go worker.DrainMemory(context.Background(), mem, ingest.NewStore(gdb), 500*time.Millisecond)
+		return mem
+	}
+	return rq
 }
 
 func connectWithRetry(dsn string, debug bool) (*gorm.DB, error) {
