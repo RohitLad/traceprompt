@@ -14,7 +14,7 @@ func TestHealth(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "/api/health", nil)
 	resp, err := app.Test(req, -1)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Contains(t, resp.Header.Get("Content-Type"), "application/json")
@@ -26,7 +26,7 @@ func TestNotFoundJSON(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "/nope", nil)
 	resp, err := app.Test(req, -1)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
 }

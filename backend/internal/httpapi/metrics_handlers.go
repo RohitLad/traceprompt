@@ -96,27 +96,27 @@ func (h *Handler) MetricsOverview(c *fiber.Ctx) error {
 		}
 	}
 
-	days_out := make([]dayBucket, 0, len(byDay))
+	daysOut := make([]dayBucket, 0, len(byDay))
 	for _, b := range byDay {
-		days_out = append(days_out, *b)
+		daysOut = append(daysOut, *b)
 	}
 	// Sort ascending by date (insertion order is random from map).
-	for i := 1; i < len(days_out); i++ {
-		for j := i; j > 0 && days_out[j-1].Date > days_out[j].Date; j-- {
-			days_out[j-1], days_out[j] = days_out[j], days_out[j-1]
+	for i := 1; i < len(daysOut); i++ {
+		for j := i; j > 0 && daysOut[j-1].Date > daysOut[j].Date; j-- {
+			daysOut[j-1], daysOut[j] = daysOut[j], daysOut[j-1]
 		}
 	}
-	models_out := make([]modelBucket, 0, len(byModel))
+	modelsOut := make([]modelBucket, 0, len(byModel))
 	for _, b := range byModel {
-		models_out = append(models_out, *b)
+		modelsOut = append(modelsOut, *b)
 	}
 	// Deterministic order: most observations first, ties by name.
-	for i := 1; i < len(models_out); i++ {
+	for i := 1; i < len(modelsOut); i++ {
 		for j := i; j > 0 &&
-			(models_out[j-1].Observations < models_out[j].Observations ||
-				(models_out[j-1].Observations == models_out[j].Observations &&
-					models_out[j-1].Model > models_out[j].Model)); j-- {
-			models_out[j-1], models_out[j] = models_out[j], models_out[j-1]
+			(modelsOut[j-1].Observations < modelsOut[j].Observations ||
+				(modelsOut[j-1].Observations == modelsOut[j].Observations &&
+					modelsOut[j-1].Model > modelsOut[j].Model)); j-- {
+			modelsOut[j-1], modelsOut[j] = modelsOut[j], modelsOut[j-1]
 		}
 	}
 	var avgLatency *float64
@@ -131,8 +131,8 @@ func (h *Handler) MetricsOverview(c *fiber.Ctx) error {
 		"inputTokens":  inputTokens,
 		"outputTokens": outputTokens,
 		"avgLatencyMs": avgLatency,
-		"perDay":       days_out,
-		"byModel":      models_out,
+		"perDay":       daysOut,
+		"byModel":      modelsOut,
 		"truncated":    len(traces) == maxMetricsRows || len(obs) == maxMetricsRows,
 	}})
 }

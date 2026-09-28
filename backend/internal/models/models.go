@@ -1,3 +1,6 @@
+// Package models defines the GORM entities shared by the API, worker,
+// and tests. Postgres DDL lives in internal/db/migrations; these structs
+// must stay compatible with it.
 package models
 
 import (
@@ -53,10 +56,10 @@ type Project struct {
 	Name           string    `gorm:"not null" json:"name"`
 }
 
-// ApiKey authenticates SDK/public-API callers via BasicAuth pk:sk.
+// APIKey authenticates SDK/public-API callers via BasicAuth pk:sk.
 // Only a SHA-256 hash of the secret is stored; the raw secret is
 // shown once at creation time (Langfuse behavior).
-type ApiKey struct {
+type APIKey struct {
 	Base
 	ProjectID  uuid.UUID  `gorm:"index;not null" json:"projectId"`
 	Name       string     `gorm:"not null" json:"name"`
@@ -67,7 +70,7 @@ type ApiKey struct {
 }
 
 // Revoked reports whether the key can no longer authenticate.
-func (k *ApiKey) Revoked() bool {
+func (k *APIKey) Revoked() bool {
 	return k.RevokedAt != nil
 }
 
@@ -242,7 +245,7 @@ type AnnotationQueueItem struct {
 
 // AuthModels are migrated first and work on SQLite (tests) and Postgres.
 func AuthModels() []any {
-	return []any{&Organization{}, &User{}, &Membership{}, &Project{}, &ApiKey{}}
+	return []any{&Organization{}, &User{}, &Membership{}, &Project{}, &APIKey{}}
 }
 
 // AllModels lists every GORM model for AutoMigrate in tests (SQLite).

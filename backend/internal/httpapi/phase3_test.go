@@ -30,7 +30,7 @@ func postUI(t *testing.T, app *fiberApp, token, path string, body any) (int, map
 	}
 	resp, err := app.app.Test(req, -1)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return resp.StatusCode, decodeJSON(t, resp)
 }
 

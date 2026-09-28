@@ -405,22 +405,6 @@ func orEmptyMapAny(m map[string]any) map[string]any {
 	return m
 }
 
-func toMessageIn(ms []models.PromptMessage) []promptMessageIn {
-	out := make([]promptMessageIn, 0, len(ms))
-	for _, m := range ms {
-		out = append(out, promptMessageIn{Role: m.Role, Content: m.Content})
-	}
-	return out
-}
-
-func toModelMessages(ms []promptMessageIn) []models.PromptMessage {
-	out := make([]models.PromptMessage, 0, len(ms))
-	for _, m := range ms {
-		out = append(out, models.PromptMessage{Role: m.Role, Content: m.Content})
-	}
-	return out
-}
-
 func parsePositiveInt(s string) (int, error) {
 	n, err := strconv.Atoi(strings.TrimSpace(s))
 	if err != nil || n < 1 {

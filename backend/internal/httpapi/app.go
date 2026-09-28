@@ -1,3 +1,5 @@
+// Package httpapi wires the Fiber router: UI API (JWT), public API
+// (BasicAuth pk:sk), middleware, and all request handlers.
 package httpapi
 
 import (

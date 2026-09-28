@@ -20,6 +20,7 @@ type Claims struct {
 
 // IssueToken mints a signed JWT for a user.
 func IssueToken(secret string, userID uuid.UUID, ttl time.Duration) (string, error) {
+	//nolint:gosec // compares against the documented dev placeholder, not a real secret
 	if secret == "" || secret == "dev-only-change-me" {
 		return "", fmt.Errorf("jwt secret not configured")
 	}

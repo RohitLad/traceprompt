@@ -43,7 +43,7 @@ func getPublic(t *testing.T, app *fiberApp, pub, sec, path string) (int, map[str
 	}
 	resp, err := app.app.Test(req, -1)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return resp.StatusCode, decodeJSON(t, resp)
 }
 
@@ -59,7 +59,7 @@ func postPublic(t *testing.T, app *fiberApp, pub, sec, path string, body any) (i
 	}
 	resp, err := app.app.Test(req, -1)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return resp.StatusCode, decodeJSON(t, resp)
 }
 
@@ -72,7 +72,7 @@ func getUI(t *testing.T, app *fiberApp, token, path string) (int, map[string]any
 	}
 	resp, err := app.app.Test(req, -1)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return resp.StatusCode, decodeJSON(t, resp)
 }
 
@@ -97,7 +97,7 @@ func postIngestion(t *testing.T, app *fiberApp, pub, sec string, batch string) (
 	}
 	resp, err := app.app.Test(req, -1)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	return resp.StatusCode, decodeJSON(t, resp)
 }
 

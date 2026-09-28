@@ -31,7 +31,7 @@ type createdKeyOut struct {
 	Secret string `json:"secret"`
 }
 
-func toKeyOut(k models.ApiKey) keyOut {
+func toKeyOut(k models.APIKey) keyOut {
 	return keyOut{
 		ID: k.ID, ProjectID: k.ProjectID, Name: k.Name,
 		PublicKey: k.PublicKey, CreatedAt: k.CreatedAt, RevokedAt: k.RevokedAt,
@@ -60,7 +60,7 @@ func (h *Handler) CreateKey(c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	key := models.ApiKey{
+	key := models.APIKey{
 		ProjectID: p.ID, Name: strings.TrimSpace(req.Name),
 		PublicKey: gen.PublicKey, SecretHash: gen.Hash, CreatedBy: &uid,
 	}
@@ -80,7 +80,7 @@ func (h *Handler) ListKeys(c *fiber.Ctx) error {
 	if p == nil {
 		return fiber.NewError(fiber.StatusNotFound, "project not found")
 	}
-	var keys []models.ApiKey
+	var keys []models.APIKey
 	if err := h.db.Where("project_id = ?", p.ID).Order("created_at ASC").Find(&keys).Error; err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (h *Handler) RevokeKey(c *fiber.Ctx) error {
 	if err != nil {
 		return fiber.NewError(fiber.StatusBadRequest, "invalid key id")
 	}
-	var key models.ApiKey
+	var key models.APIKey
 	if err := h.db.First(&key, "id = ? AND project_id = ?", keyID, p.ID).Error; err != nil {
 		return fiber.NewError(fiber.StatusNotFound, "key not found")
 	}

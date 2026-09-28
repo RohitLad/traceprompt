@@ -14,3 +14,11 @@ test('login page renders sign-in form', async ({ page }) => {
 	await expect(page.getByPlaceholder('Email')).toBeVisible();
 	await expect(page.getByPlaceholder(/Password/)).toBeVisible();
 });
+
+test('navbar exposes all product areas', async ({ page }) => {
+	await page.goto('/');
+	const nav = page.getByTestId('navbar');
+	for (const label of ['Dashboard', 'Traces', 'Sessions', 'Scores', 'Prompts', 'Playground', 'Datasets']) {
+		await expect(nav.getByRole('link', { name: label })).toBeVisible();
+	}
+});

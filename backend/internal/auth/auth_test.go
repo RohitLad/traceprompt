@@ -49,7 +49,7 @@ func TestJWTRejectsBadSecretAndExpiry(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestApiKeyFormatAndCheck(t *testing.T) {
+func TestAPIKeyFormatAndCheck(t *testing.T) {
 	k, err := GenerateKey()
 	require.NoError(t, err)
 	assert.True(t, strings.HasPrefix(k.PublicKey, PublicPrefix))
@@ -58,7 +58,7 @@ func TestApiKeyFormatAndCheck(t *testing.T) {
 	assert.False(t, CheckSecret("sk-lf-wrong", k.Hash))
 }
 
-func TestApiKeyUniqueness(t *testing.T) {
+func TestAPIKeyUniqueness(t *testing.T) {
 	a, err := GenerateKey()
 	require.NoError(t, err)
 	b, err := GenerateKey()

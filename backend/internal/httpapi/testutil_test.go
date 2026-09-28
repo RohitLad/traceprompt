@@ -18,7 +18,7 @@ import (
 	"github.com/traceprompt/traceprompt/backend/internal/queue"
 )
 
-const testJWTSecret = "test-secret-32-chars-minimum-xyz!"
+const testJWTSecret = "test-secret-32-chars-minimum-xyz!" //nolint:gosec // test-only credential
 
 // fiberApp bundles the Fiber app with its test database and queue.
 type fiberApp struct {
@@ -59,7 +59,7 @@ func doRequest(t *testing.T, app *fiberApp, method, path string, body any, heade
 	}
 	resp, err := app.app.Test(req, -1)
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	raw, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	var decoded map[string]any

@@ -1,3 +1,4 @@
+// Package db owns Postgres connectivity and versioned schema migrations.
 package db
 
 import (

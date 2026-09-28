@@ -15,6 +15,7 @@ func TestRender(t *testing.T) {
 	assert.Equal(t, "Hi Ada!", Render("Hi {{name}}!", map[string]string{"name": "Ada"}))
 	assert.Equal(t, "Hi  !", Render("Hi {{ name }} !", nil), "missing vars render empty")
 	assert.Equal(t, "no vars", Render("no vars", map[string]string{"a": "b"}))
+	assert.Equal(t, "x-x", Render("{{a}}-{{a}}", map[string]string{"a": "x"}), "repeats render")
 }
 
 func TestMissing(t *testing.T) {
@@ -62,4 +63,14 @@ func TestRunFailures(t *testing.T) {
 	_, err = NewClient().Run(context.Background(), empty.URL, "test-key", "m",
 		[]Message{{Role: "user", Content: "Hi"}})
 	assert.ErrorContains(t, err, "no choices")
+}
+
+func TestRunRejectsBadShapes(t *testing.T) {
+	badJSON := mockProvider(t, 200, `not json`)
+	_, err := NewClient().Run(context.Background(), badJSON.URL, "test-key", "m",
+		[]Message{{Role: "user", Content: "Hi"}})
+	assert.Error(t, err)
+
+	_, err = NewClient().Run(context.Background(), "http://127.0.0.1:1", "k", "", nil)
+	assert.Error(t, err, "missing model rejected")
 }

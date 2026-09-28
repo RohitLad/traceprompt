@@ -35,7 +35,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("worker: redis: %v", err)
 	}
-	defer rq.Close()
+	defer func() { _ = rq.Close() }()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

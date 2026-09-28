@@ -108,7 +108,7 @@ func (c *Client) Run(ctx context.Context, baseURL, apiKey, model string, message
 	if err != nil {
 		return Result{}, fmt.Errorf("provider: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return Result{}, fmt.Errorf("provider returned %d", resp.StatusCode)
 	}

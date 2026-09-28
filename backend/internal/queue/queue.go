@@ -75,7 +75,6 @@ type Envelope struct {
 type Memory struct {
 	mu    sync.Mutex
 	items []Item
-	next  uint64
 }
 
 var _ Queue = (*Memory)(nil)

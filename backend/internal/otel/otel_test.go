@@ -59,6 +59,42 @@ func TestToEvents(t *testing.T) {
 	assert.Equal(t, "hi", obsBody["input"])
 }
 
+func TestErrorStatusAndPromptLink(t *testing.T) {
+	raw := `{"resourceSpans":[{
+		"scopeSpans": [{"spans": [
+			{"traceId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "spanId": "cccccccccccccccc", "name": "llm",
+			 "startTimeUnixNano": "1760000000000000000", "endTimeUnixNano": "1760000002000000000",
+			 "status": {"code": 2, "message": "boom"},
+			 "attributes": [
+				{"key": "langfuse.prompt.name", "value": {"stringValue": "greet"}},
+				{"key": "langfuse.prompt.version", "value": {"stringValue": "3"}},
+				{"key": "langfuse.usage.total", "value": {"stringValue": "42"}},
+				{"key": "langfuse.tags", "value": {"stringValue": "a, b ,c"}},
+				{"key": "debug", "value": {"boolValue": true}},
+				{"key": "ratio", "value": {"doubleValue": 0.5}}
+			 ]}
+		]}]}]}`
+	evs, errs := ToEvents(json.RawMessage(raw))
+	require.Empty(t, errs)
+	require.Len(t, evs, 2, "root span emits trace + observation")
+
+	var obs map[string]any
+	require.NoError(t, json.Unmarshal(evs[1].Body, &obs))
+	assert.Equal(t, "ERROR", obs["level"])
+	assert.Equal(t, "boom", obs["statusMessage"])
+	assert.Equal(t, "greet", obs["promptName"])
+	assert.Equal(t, float64(3), obs["promptVersion"])
+	usage, _ := obs["usage"].(map[string]any)
+	assert.Equal(t, float64(42), usage["total"])
+
+	var trace map[string]any
+	require.NoError(t, json.Unmarshal(evs[0].Body, &trace))
+	assert.Equal(t, []any{"a", "b", "c"}, trace["tags"], "comma tags split + trimmed")
+	meta, _ := trace["metadata"].(map[string]any)
+	assert.Equal(t, true, meta["debug"])
+	assert.Equal(t, 0.5, meta["ratio"])
+}
+
 func TestToEventsRejectsBadSpans(t *testing.T) {
 	evs, errs := ToEvents(json.RawMessage(`{"resourceSpans":[{
 		"scopeSpans": [{"spans": [

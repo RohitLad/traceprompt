@@ -25,7 +25,7 @@ func TestPublicRateLimit(t *testing.T) {
 		req, _ := http.NewRequest(http.MethodGet, "/api/public/projects", nil)
 		resp, err := app.Test(req, -1)
 		require.NoError(t, err)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 		if resp.StatusCode == http.StatusTooManyRequests {
 			limited = true
 			break
@@ -37,6 +37,6 @@ func TestPublicRateLimit(t *testing.T) {
 	req, _ := http.NewRequest(http.MethodGet, "/api/health", nil)
 	resp, err := app.Test(req, -1)
 	require.NoError(t, err)
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }

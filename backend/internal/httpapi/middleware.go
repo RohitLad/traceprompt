@@ -24,7 +24,8 @@ type Handler struct {
 const (
 	ctxUserKey    = "tp_user_id"
 	ctxProjectKey = "tp_project"
-	ctxAPIKeyKey  = "tp_api_key"
+	//nolint:gosec // context key name, not a credential
+	ctxAPIKeyKey = "tp_api_key"
 )
 
 // requireJWT validates `Authorization: Bearer <jwt>` and stores the user ID.
@@ -89,14 +90,14 @@ func currentProject(c *fiber.Ctx) *models.Project {
 }
 
 // requireAPIKey validates BasicAuth `pk-lf-...:sk-lf-...` for /api/public.
-// On success stores the ApiKey + Project. Revoked keys are rejected.
+// On success stores the APIKey + Project. Revoked keys are rejected.
 func (h *Handler) requireAPIKey(c *fiber.Ctx) error {
 	pub, sec, ok := parseBasicAuth(c.Get("Authorization"))
 	if !ok || pub == "" || sec == "" {
 		c.Set("WWW-Authenticate", `Basic realm="traceprompt"`)
 		return fiber.NewError(fiber.StatusUnauthorized, "missing api credentials")
 	}
-	var key models.ApiKey
+	var key models.APIKey
 	if err := h.db.First(&key, "public_key = ?", pub).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fiber.NewError(fiber.StatusUnauthorized, "invalid credentials")

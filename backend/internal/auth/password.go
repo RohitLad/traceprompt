@@ -1,3 +1,5 @@
+// Package auth implements credentials: bcrypt passwords, JWT sessions,
+// and pk-lf-/sk-lf- API key generation with SHA-256 storage.
 package auth
 
 import (

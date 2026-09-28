@@ -22,7 +22,7 @@ func mockLLM(t *testing.T, reply string) string {
 		var req map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&req)
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"model":"mock","choices":[{"message":{"role":"assistant","content":%q}}],
+		_, _ = fmt.Fprintf(w, `{"model":"mock","choices":[{"message":{"role":"assistant","content":%q}}],
 			"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`, reply)
 	}))
 	t.Cleanup(srv.Close)
